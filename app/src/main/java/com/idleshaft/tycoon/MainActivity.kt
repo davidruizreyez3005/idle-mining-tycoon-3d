@@ -1,0 +1,51 @@
+package com.idleshaft.tycoon
+
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
+import androidx.compose.runtime.Composable
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import com.idleshaft.tycoon.ui.GameScreen
+import com.idleshaft.tycoon.ui.theme.IdleShaftTheme
+import com.idleshaft.tycoon.viewmodel.GameViewModel
+
+/**
+ * Single-activity game. Immersive fullscreen (system bars hidden, swipe to reveal),
+ * edge-to-edge Compose UI with the 3D Filament scene layered underneath the HUD.
+ */
+class MainActivity : ComponentActivity() {
+
+    private val viewModel: GameViewModel by viewModels { GameViewModel.Factory(application) }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        hideSystemBars()
+        setContent {
+            IdleShaftTheme {
+                GameScreen(viewModel)
+            }
+        }
+    }
+
+    override fun onPause() {
+        viewModel.onAppPause()
+        super.onPause()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) hideSystemBars()
+    }
+
+    private fun hideSystemBars() {
+        val controller = WindowCompat.getInsetsController(window, window.decorView)
+        controller.systemBarsBehavior =
+            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        controller.hide(WindowInsetsCompat.Type.systemBars())
+    }
+}
