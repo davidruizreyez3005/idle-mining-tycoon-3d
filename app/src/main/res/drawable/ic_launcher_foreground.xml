@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Launcher foreground: a faceted diamond over a dark mine-shaft silhouette. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- pickaxe handle -->
+    <path
+        android:fillColor="#8D6E63"
+        android:pathData="M38,70 L70,38 L74,42 L42,74 Z" />
+
+    <!-- pickaxe head -->
+    <path
+        android:fillColor="#CFD8DC"
+        android:pathData="M30,52 C36,42 48,34 62,32 L66,36 C52,38 42,44 36,56 Z" />
+
+    <!-- diamond crystal -->
+    <path
+        android:fillColor="#7FE3FF"
+        android:pathData="M46,58 L54,50 L70,50 L76,58 L61,78 Z" />
+
+    <!-- diamond top facet highlight -->
+    <path
+        android:fillColor="#C8F4FF"
+        android:pathData="M54,50 L70,50 L62,58 L46,58 Z" />
+
+    <!-- sparkle -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M74,30 L76,34 L80,36 L76,38 L74,42 L72,38 L68,36 L72,34 Z" />
+</vector>
