@@ -1,0 +1,27 @@
+# Gradle
+.gradle/
+build/
+app/build/
+captures/
+.kotlin/
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+*.iws
+*.ipr
+local.properties
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets — never commit tokens or keys
+*.jks
+*.keystore
+secrets.properties
+ghp_*
+
+# Logs / crash reports
+*.log
+*.hprof
