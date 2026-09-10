@@ -3,12 +3,24 @@ name: Android CI
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'apk/**'
+      - 'README.md'
+      - '**.md'
   pull_request:
     branches: [main]
+    paths-ignore:
+      - 'apk/**'
+  workflow_dispatch:
+
+# The workflow commits the built APK back into this repository and publishes
+# releases — both need write access to contents.
+permissions:
+  contents: write
 
 jobs:
   build:
-    name: Build debug APK
+    name: Build & publish APK
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -20,13 +32,58 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Setup Gradle
+      - name: Setup Gradle (caching)
         uses: gradle/actions/setup-gradle@v4
 
       - name: Build & unit test
         run: ./gradlew assembleDebug testDebugUnitTest --stacktrace
 
-      - name: Upload APK artifact
+      - name: Sanity-check the APK
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+          AAPT2="$(find "$ANDROID_HOME/build-tools" -name aapt2 | sort -V | tail -1)"
+          echo "Using aapt2: $AAPT2"
+          "$AAPT2" dump badging "$APK" | head -n 4
+          unzip -t "$APK" > /dev/null && echo "ZIP integrity OK"
+
+      - name: Push APK into the repository
+        if: github.event_name != 'pull_request'
+        run: |
+          set -euo pipefail
+          mkdir -p apk
+          cp app/build/outputs/apk/debug/app-debug.apk apk/idle-shaft-tycoon-3d-debug.apk
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apk/idle-shaft-tycoon-3d-debug.apk
+          if git diff --cached --quiet; then
+            echo "APK byte-identical to the published one — nothing to push."
+          else
+            git commit -m "chore(ci): publish debug APK (build #${{ github.run_number }}) [skip ci]"
+            git pull --rebase origin main
+            git push origin HEAD:main
+            echo "APK pushed to apk/idle-shaft-tycoon-3d-debug.apk on main."
+          fi
+
+      - name: Attach APK to a GitHub Release
+        if: github.event_name != 'pull_request'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.1-b${{ github.run_number }}
+          name: Idle Shaft Tycoon 3D — Build #${{ github.run_number }}
+          body: |
+            Automated build from `main` @ ${{ github.sha }}.
+
+            **Install:** download `idle-shaft-tycoon-3d-debug.apk` below (also
+            tracked in the repository at `apk/idle-shaft-tycoon-3d-debug.apk`),
+            then sideload it on any Android 6.0+ device. Debug-signed — enable
+            "Install unknown apps" for your browser/file manager when prompted.
+          files: apk/idle-shaft-tycoon-3d-debug.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload APK artifact (14-day backup)
         uses: actions/upload-artifact@v4
         with:
           name: idle-shaft-tycoon-3d-debug
