@@ -18,10 +18,12 @@ import org.junit.Test
 class EconomyTest {
 
     private fun automatedState(): GameState {
-        // Copper shaft fully automated + refinery + trucks automated.
+        // Copper shaft fully automated + refinery + trucks automated (level 1 everything).
         var state = GameState.initial(nowMs = 1_000L)
         state = state.copy(
-            shafts = state.shafts.map { it.copy(unlocked = true, managerHired = true) },
+            shafts = state.shafts.map {
+                if (it.oreType == OreType.COPPER) it.copy(unlocked = true, managerHired = true) else it
+            },
             refinery = state.refinery.copy(managerHired = true),
             logistics = state.logistics.copy(managerHired = true),
             boostUntilMs = 0L,

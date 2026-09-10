@@ -18,15 +18,15 @@ object Economy {
     const val ORE_PER_BAR = 10.0
 
     /** Seconds a miner takes to walk between the seam and the shaft stockpile (each way). */
-    const val MINER_WALK_SECONDS = 1.2
+    const val MINER_WALK_SECONDS: Float = 1.2f
 
     /** Cart loading / unloading duration in seconds. */
-    const val CART_LOAD_SECONDS = 1.2
-    const val CART_UNLOAD_SECONDS = 0.8
+    const val CART_LOAD_SECONDS: Float = 1.2f
+    const val CART_UNLOAD_SECONDS: Float = 0.8f
 
     /** Truck dwell times in seconds. */
-    const val TRUCK_LOAD_SECONDS = 0.8
-    const val TRUCK_SELL_SECONDS = 0.6
+    const val TRUCK_LOAD_SECONDS: Float = 0.8f
+    const val TRUCK_SELL_SECONDS: Float = 0.6f
 
     /** Base offline earnings cap in hours (extendable via the Warehouse upgrade). */
     const val BASE_OFFLINE_CAP_HOURS = 4

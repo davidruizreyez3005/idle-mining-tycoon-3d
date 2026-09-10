@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
 import com.idleshaft.tycoon.data.GameRepository
 import com.idleshaft.tycoon.domain.GameEvent
 import com.idleshaft.tycoon.domain.GameIntent
