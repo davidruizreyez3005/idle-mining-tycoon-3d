@@ -12,6 +12,21 @@ Filament-based 3D engine for Compose).
 
 ---
 
+## 📲 Install the ready-made APK
+
+No build required — CI builds and publishes the game on every push to `main`:
+
+- **In this repo:** grab [`apk/idle-shaft-tycoon-3d-debug.apk`](apk/idle-shaft-tycoon-3d-debug.apk)
+  (committed automatically by the [Android CI](.github/workflows/android-ci.yml) workflow).
+- **From Releases:** every build is also archived on the
+  [Releases page](https://github.com/davidruizreyez3005/idle-mining-tycoon-3d/releases).
+
+Sideload it on any Android 6.0+ (API 24) device: allow "Install unknown apps" for your
+browser / file manager when prompted, then install and start digging. The APK is
+debug-signed, so it also works with `adb install`.
+
+---
+
 ## 🎮 The Game
 
 You run a surface mining company. The production pipeline is the core loop:
