@@ -2,38 +2,34 @@ package com.idleshaft.tycoon.game.threed
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import com.google.android.filament.MaterialInstance
 import com.idleshaft.tycoon.domain.OreType
 import io.github.sceneview.SceneScope
-import io.github.sceneview.loaders.MaterialLoader
 import io.github.sceneview.math.Position
 import io.github.sceneview.math.Size
 
-/** Creates (and caches) one lit [MaterialInstance] per palette color. */
-class ColorMaterials(private val loader: MaterialLoader) {
-    private val cache = HashMap<Int, MaterialInstance>()
-
-    fun of(argb: Long): MaterialInstance = cache.getOrPut(argb.toInt()) {
-        loader.createColorInstance(argb.toInt())
-    }
-
-    fun ore(type: OreType): MaterialInstance = of(type.argb)
-    fun bar(type: OreType): MaterialInstance = of(type.barArgb)
-}
-
 @Composable
-private fun SceneScope.rememberColorMaterials(): ColorMaterials =
-    remember(materialLoader) { ColorMaterials(materialLoader) }
+private fun SceneScope.rememberToonMaterials(): ToonMaterials =
+    remember(materialLoader) { ToonMaterials(materialLoader) }
 
 // ---------------------------------------------------------------------------
 // Static world construction. Every node is created exactly once; animated ones
 // are captured into [MineWorld] through `apply` blocks. No Compose state is read
 // here — the content composes once and never recomposes.
+//
+// Layout rules (the "no clipping" contract):
+//  - The facility deck is split into front/back strips so the trench
+//    footprints stay OPEN — the underground floor, veins, stockpiles, miners
+//    and carts are always visible and never poke through the deck.
+//  - The cross belt is an elevated bridge; its legs land between the shafts.
+//  - The truck road runs east of the bar platform with a clear gap; the truck
+//    parks beside (never inside) the platform and the market stall.
+//  - Overlapping solids are always offset by >= 0.02 m so no two faces are
+//    coplanar (no z-fighting shimmer).
 // ---------------------------------------------------------------------------
 
 @Composable
 internal fun SceneScope.MineSceneContent(world: MineWorld) {
-    val mats = rememberColorMaterials()
+    val mats = rememberToonMaterials()
 
     Ground(mats)
     Shafts(world, mats)
@@ -47,50 +43,56 @@ internal fun SceneScope.MineSceneContent(world: MineWorld) {
 }
 
 @Composable
-private fun SceneScope.Ground(mats: ColorMaterials) {
-    // Grass base.
+private fun SceneScope.Ground(mats: ToonMaterials) {
+    // Grass base — oversized so the horizon never clips into the void.
     CubeNode(
-        size = Size(30f, 0.5f, 30f),
+        size = Size(48f, 0.5f, 48f),
         materialInstance = mats.of(MineWorld.GRASS),
         position = Position(0f, -0.25f, 0f),
     )
-    // Packed-dirt facility deck.
+    // Packed-dirt facility deck: front strip stops short of the trenches.
     CubeNode(
-        size = Size(19f, 0.1f, 13.5f),
+        size = Size(19f, 0.1f, 9.05f),
         materialInstance = mats.of(MineWorld.DIRT_DECK),
-        position = Position(0f, 0.02f, 0.6f),
+        position = Position(0f, 0.02f, -1.625f),
+    )
+    // Back strip behind the trench row.
+    CubeNode(
+        size = Size(19f, 0.1f, 1.05f),
+        materialInstance = mats.of(MineWorld.DIRT_DECK),
+        position = Position(0f, 0.02f, 6.825f),
     )
 }
 
 @Composable
-private fun SceneScope.Shafts(world: MineWorld, mats: ColorMaterials) {
+private fun SceneScope.Shafts(world: MineWorld, mats: ToonMaterials) {
     for (i in 0 until MineWorld.ShaftCount) {
         val x = MineWorld.shaftX(i)
 
-        // Open trench (always visible, even when locked).
+        // Open trench with a dark collar slightly proud of the deck rim.
         CubeNode(
-            size = Size(2.6f, 3.75f, 3.4f),
+            size = Size(2.6f, MineWorld.SHAFT_TRENCH_DEPTH, 3.4f),
             materialInstance = mats.of(MineWorld.TRENCH_DARK),
-            position = Position(x, -1.85f, MineWorld.SHAFT_Z),
+            position = Position(x, MineWorld.TRENCH_TOP_Y - MineWorld.SHAFT_TRENCH_DEPTH / 2f, MineWorld.SHAFT_Z),
         )
 
-        // Rock lid while the shaft is still locked.
+        // Rock lid while the shaft is still locked — seated flush on the collar.
         CubeNode(
-            size = Size(2.4f, 0.35f, 3.2f),
+            size = Size(2.7f, 0.35f, 3.5f),
             materialInstance = mats.of(MineWorld.ROCK_LID),
-            position = Position(x, 0.2f, MineWorld.SHAFT_Z),
+            position = Position(x, MineWorld.TRENCH_TOP_Y + 0.175f, MineWorld.SHAFT_Z),
             apply = { world.shafts[i].lid = this },
         )
 
         // Everything else hides behind this group while locked.
         Node(apply = { world.shafts[i].group = this }) {
 
-            // Ore seam cubes at the bottom of the trench.
+            // Ore seam cubes at the back of the trench floor.
             for (v in 0 until 3) {
                 CubeNode(
                     size = Size(0.45f, 0.45f, 0.45f),
                     materialInstance = mats.ore(OreType.ordered[i]),
-                    position = Position(x + (v - 1) * 0.6f, MineWorld.SHAFT_FLOOR_Y - 0.15f, MineWorld.SHAFT_Z - 0.9f),
+                    position = Position(x + (v - 1) * 0.6f, MineWorld.SHAFT_FLOOR_Y - 0.15f, MineWorld.SHAFT_Z - 1.05f),
                     apply = { world.shafts[i].vein[v] = this },
                 )
             }
@@ -105,19 +107,20 @@ private fun SceneScope.Shafts(world: MineWorld, mats: ColorMaterials) {
                 )
             }
 
-            // Headframe: legs, crossbar, guide rails.
+            // Headframe: legs stand OUTSIDE the trench footprint on the grass,
+            // the crossbar spans between them, the pulley rides on top.
             CubeNode(
                 size = Size(0.24f, 3.0f, 0.24f),
                 materialInstance = mats.of(MineWorld.WOOD),
-                position = Position(x - 0.95f, 1.5f, MineWorld.SHAFT_Z),
+                position = Position(x - 1.55f, 1.49f, MineWorld.SHAFT_Z),
             )
             CubeNode(
                 size = Size(0.24f, 3.0f, 0.24f),
                 materialInstance = mats.of(MineWorld.WOOD),
-                position = Position(x + 0.95f, 1.5f, MineWorld.SHAFT_Z),
+                position = Position(x + 1.55f, 1.49f, MineWorld.SHAFT_Z),
             )
             CubeNode(
-                size = Size(2.3f, 0.24f, 0.24f),
+                size = Size(3.6f, 0.24f, 0.24f),
                 materialInstance = mats.of(MineWorld.STEEL),
                 position = Position(x, 3.05f, MineWorld.SHAFT_Z),
             )
@@ -128,16 +131,16 @@ private fun SceneScope.Shafts(world: MineWorld, mats: ColorMaterials) {
                 materialInstance = mats.of(MineWorld.STEEL),
                 position = Position(x, 3.35f, MineWorld.SHAFT_Z),
             )
-            // Guide rails from the trench bottom to the crossbar.
+            // Guide rails clear of the 0.9 m-wide cart (rails at +/-0.55).
             CubeNode(
                 size = Size(0.09f, 6.6f, 0.09f),
                 materialInstance = mats.of(MineWorld.STEEL_MID),
-                position = Position(x - 0.45f, -0.25f, MineWorld.SHAFT_Z),
+                position = Position(x - 0.55f, -0.25f, MineWorld.SHAFT_Z),
             )
             CubeNode(
                 size = Size(0.09f, 6.6f, 0.09f),
                 materialInstance = mats.of(MineWorld.STEEL_MID),
-                position = Position(x + 0.45f, -0.25f, MineWorld.SHAFT_Z),
+                position = Position(x + 0.55f, -0.25f, MineWorld.SHAFT_Z),
             )
 
             // Elevator cart with ore load slots.
@@ -177,12 +180,21 @@ private fun SceneScope.Shafts(world: MineWorld, mats: ColorMaterials) {
 }
 
 @Composable
-private fun SceneScope.CrossConveyor(world: MineWorld, mats: ColorMaterials) {
+private fun SceneScope.CrossConveyor(world: MineWorld, mats: ToonMaterials) {
+    // Elevated belt bridge across the shaft row.
     CubeNode(
-        size = Size(14.5f, 0.14f, 0.7f),
+        size = Size(MineWorld.CROSS_BELT_HALF_LENGTH * 2f, 0.14f, 0.7f),
         materialInstance = mats.of(MineWorld.CONVEYOR_BELT),
         position = Position(0f, MineWorld.CROSS_BELT_Y, MineWorld.CROSS_BELT_Z),
     )
+    // Support legs landing in the gaps between the trench footprints.
+    for (legX in listOf(-8.2f, -4.2f, 0f, 4.2f, 8.2f)) {
+        CubeNode(
+            size = Size(0.12f, 0.35f, 0.12f),
+            materialInstance = mats.of(MineWorld.STEEL_MID),
+            position = Position(legX, 0.175f, MineWorld.CROSS_BELT_Z),
+        )
+    }
     for (i in 0 until world.crossBeltOre.size) {
         CubeNode(
             size = Size(0.2f, 0.2f, 0.2f),
@@ -194,30 +206,30 @@ private fun SceneScope.CrossConveyor(world: MineWorld, mats: ColorMaterials) {
 }
 
 @Composable
-private fun SceneScope.MainConveyor(world: MineWorld, mats: ColorMaterials) {
+private fun SceneScope.MainConveyor(world: MineWorld, mats: ToonMaterials) {
     CubeNode(
-        size = Size(0.7f, 0.14f, 3.4f),
+        size = Size(0.7f, 0.14f, 2.7f),
         materialInstance = mats.of(MineWorld.CONVEYOR_BELT),
-        position = Position(MineWorld.MAIN_BELT_X, MineWorld.MAIN_BELT_Y, 2.0f),
+        position = Position(MineWorld.MAIN_BELT_X, MineWorld.MAIN_BELT_Y, 1.65f),
     )
-    // Feeder chute from the cross belt down to the main belt.
+    // Feeder chute bridging the cross belt down to the main belt.
     CubeNode(
         size = Size(0.5f, 0.4f, 0.5f),
         materialInstance = mats.of(MineWorld.STEEL_MID),
-        position = Position(MineWorld.MAIN_BELT_X, MineWorld.MAIN_BELT_Y + 0.28f, 3.15f),
+        position = Position(MineWorld.MAIN_BELT_X, MineWorld.MAIN_BELT_Y + 0.28f, 2.75f),
     )
     for (i in 0 until world.mainBeltOre.size) {
         CubeNode(
             size = Size(0.2f, 0.2f, 0.2f),
             materialInstance = mats.of(MineWorld.ORE_GENERIC),
-            position = Position(MineWorld.MAIN_BELT_X, MineWorld.MAIN_BELT_Y + 0.17f, 2.0f),
+            position = Position(MineWorld.MAIN_BELT_X, MineWorld.MAIN_BELT_Y + 0.17f, 1.65f),
             apply = { world.mainBeltOre[i] = this },
         )
     }
 }
 
 @Composable
-private fun SceneScope.Crusher(world: MineWorld, mats: ColorMaterials) {
+private fun SceneScope.Crusher(world: MineWorld, mats: ToonMaterials) {
     // Machine body + hopper + piston + smoke puffs.
     CubeNode(
         size = Size(2.4f, 1.6f, 2.0f),
@@ -246,14 +258,14 @@ private fun SceneScope.Crusher(world: MineWorld, mats: ColorMaterials) {
 }
 
 @Composable
-private fun SceneScope.BarOutput(world: MineWorld, mats: ColorMaterials) {
+private fun SceneScope.BarOutput(world: MineWorld, mats: ToonMaterials) {
     // Short output belt from the crusher to the bar platform.
     CubeNode(
         size = Size(0.6f, 0.12f, 1.5f),
         materialInstance = mats.of(MineWorld.CONVEYOR_BELT),
         position = Position(0f, 0.5f, -2.6f),
     )
-    // Bar platform.
+    // Bar platform (west of the truck road, with a clear gap).
     CubeNode(
         size = Size(1.9f, 0.35f, 1.1f),
         materialInstance = mats.of(MineWorld.WOOD),
@@ -271,12 +283,12 @@ private fun SceneScope.BarOutput(world: MineWorld, mats: ColorMaterials) {
 }
 
 @Composable
-private fun SceneScope.RoadAndMarket(mats: ColorMaterials) {
-    // Road strip to the market.
+private fun SceneScope.RoadAndMarket(mats: ToonMaterials) {
+    // Road strip to the market (long enough for the sell parking spot).
     CubeNode(
-        size = Size(1.9f, 0.08f, 7.2f),
+        size = Size(1.9f, 0.08f, MineWorld.ROAD_LENGTH),
         materialInstance = mats.of(MineWorld.ROAD),
-        position = Position(MineWorld.TRUCK_LOAD_X, 0.05f, -7.0f),
+        position = Position(MineWorld.TRUCK_LOAD_X, 0.05f, MineWorld.ROAD_Z_CENTER),
     )
     val mx = MineWorld.TRUCK_LOAD_X
     val mz = MineWorld.MARKET_Z
@@ -318,7 +330,15 @@ private fun SceneScope.RoadAndMarket(mats: ColorMaterials) {
 }
 
 @Composable
-private fun SceneScope.Truck(world: MineWorld, mats: ColorMaterials) {
+private fun SceneScope.Truck(world: MineWorld, mats: ToonMaterials) {
+    // Flat toon blob shadow under the truck (drives the "grounded" look —
+    // the truck hops above it, the shadow stays glued to the road).
+    CubeNode(
+        size = Size(1.5f, 0.02f, 2.2f),
+        materialInstance = mats.blobShadow,
+        position = Position(MineWorld.TRUCK_LOAD_X, MineWorld.TRUCK_SHADOW_Y, MineWorld.TRUCK_LOAD_Z),
+        apply = { world.truckShadow = this },
+    )
     Node(apply = { world.truck = this }) {
         // Chassis.
         CubeNode(
@@ -367,7 +387,7 @@ private fun SceneScope.Truck(world: MineWorld, mats: ColorMaterials) {
 }
 
 @Composable
-private fun SceneScope.Decor(mats: ColorMaterials) {
+private fun SceneScope.Decor(mats: ToonMaterials) {
     val trees = listOf(
         -11.5f to -8.5f, -8.5f to -10.5f, 11.5f to -8.5f, 8.5f to -10.5f,
         -11.5f to 5.5f, 11.5f to 6.5f, -12.5f to -1.5f, 12.5f to 1.5f,
@@ -379,7 +399,7 @@ private fun SceneScope.Decor(mats: ColorMaterials) {
             radius = 0.13f * scale,
             height = 0.9f * scale,
             materialInstance = mats.of(MineWorld.TRUNK),
-            position = Position(x, 0.45f * scale, z),
+            position = Position(x, 0.45f * scale + 0.01f, z),
         )
         if (i % 2 == 0) {
             ConeNode(

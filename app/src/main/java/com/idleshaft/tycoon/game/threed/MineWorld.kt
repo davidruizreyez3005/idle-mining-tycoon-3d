@@ -42,6 +42,9 @@ class MineWorld {
     /** The delivery truck (root moves along the road). */
     var truck: Node? = null
 
+    /** Flat toon blob shadow under the truck (follows the truck on the road). */
+    var truckShadow: Node? = null
+
     /** Bar cubes riding on the truck's cargo bed. */
     val truckBars: Array<Node?> = arrayOfNulls(6)
 
@@ -51,33 +54,58 @@ class MineWorld {
 
         // ------------------------------------------------------------------
         // World layout — authored coordinates, meters.
+        //
+        // Everything is laid out so no prop interpenetrates another and no
+        // coplanar faces z-fight: the facility deck leaves the trench
+        // footprints open (front/back strips), the cross belt is an elevated
+        // bridge whose legs land between the shafts, and the truck road is
+        // offset from the bar platform with a clear gap.
         // ------------------------------------------------------------------
 
         /** X position of shaft [i] (left to right). */
         fun shaftX(i: Int): Float = -6.3f + 4.2f * i
 
         const val SHAFT_Z = 4.6f
-        const val SHAFT_TRENCH_TOP = 0.05f
+
+        /** Top of the dark trench collar — slightly proud of the deck rim. */
+        const val TRENCH_TOP_Y = 0.125f
+        const val SHAFT_TRENCH_DEPTH = 3.85f
         const val SHAFT_FLOOR_Y = -3.2f
 
         /** Cart rest height at the surface (just under the headframe crossbar). */
         const val CART_TOP_Y = 0.6f
         const val CART_BOTTOM_Y = -3.2f
 
+        /** Miner walk targets inside the trench. */
+        const val MINER_MINE_Z = SHAFT_Z - 0.6f
+        const val MINER_DUMP_Z = SHAFT_Z - 0.55f
+        const val MINER_MINE_Y = -3.62f
+        const val MINER_DUMP_Y = -3.5f
+
+        /** Elevated cross-belt bridge over the shaft row. */
         const val CROSS_BELT_Y = 0.42f
         const val CROSS_BELT_Z = 3.4f
+        const val CROSS_BELT_HALF_LENGTH = 8.5f
+        const val CROSS_BELT_TRAVEL = 8.4f
 
         const val MAIN_BELT_X = 0f
         const val MAIN_BELT_Y = 0.42f
 
         const val CRUSHER_Z = -0.9f
 
-        const val TRUCK_LOAD_X = 1.2f
+        /** Truck road (offset east of the bar platform with a clear gap). */
+        const val TRUCK_LOAD_X = 2.0f
         const val TRUCK_LOAD_Z = -3.6f
+        const val TRUCK_SELL_Z = -11.8f
         const val MARKET_Z = -10.4f
+        const val ROAD_Z_CENTER = -7.8f
+        const val ROAD_LENGTH = 10.2f
+
+        /** Blob shadow rests a hair above the road surface. */
+        const val TRUCK_SHADOW_Y = 0.105f
 
         // ------------------------------------------------------------------
-        // Low-poly palette (ARGB).
+        // Low-poly toon palette (ARGB).
         // ------------------------------------------------------------------
 
         const val GRASS = 0xFF7CB342
