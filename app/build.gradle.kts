@@ -13,10 +13,10 @@ plugins {
 // in GRADLE_USER_HOME/filament-tools (so CI caches it via setup-gradle).
 // ---------------------------------------------------------------------------
 val filamentToolsVersion = "1.72.1" // must match SceneView's Filament dependency
-val matcBinary = File(
-    File(gradle.gradleUserHomeDir, "filament-tools/filament"),
-    "bin/matc",
-)
+// The tgz extracts a top-level "filament/" folder into [filamentToolsDir],
+// so matc ends up at filament-tools/filament/bin/matc.
+val filamentToolsDir = File(gradle.gradleUserHomeDir, "filament-tools")
+val matcBinary = File(filamentToolsDir, "filament/bin/matc")
 val materialsSrcDir = layout.projectDirectory.dir("src/main/materials")
 val materialsOutDir = "build/generated/toonAssets"
 
@@ -33,11 +33,14 @@ tasks.register("downloadFilamentMatc") {
             ).toURL().openStream().use { input ->
                 tgz.outputStream().use { input.copyTo(it) }
             }
-            matcBinary.parentFile.parentFile.mkdirs()
+            filamentToolsDir.mkdirs()
             exec {
-                commandLine("tar", "-xzf", tgz.absolutePath, "-C", matcBinary.parentFile.parentFile.absolutePath)
+                commandLine("tar", "-xzf", tgz.absolutePath, "-C", filamentToolsDir.absolutePath)
             }
             matcBinary.setExecutable(true)
+            check(matcBinary.isFile && matcBinary.canExecute()) {
+                "matc not found at ${matcBinary.absolutePath} after extraction"
+            }
             logger.lifecycle("matc installed at ${matcBinary.absolutePath}")
         }
     }
