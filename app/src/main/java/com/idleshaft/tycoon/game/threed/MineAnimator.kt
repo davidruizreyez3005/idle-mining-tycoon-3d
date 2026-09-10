@@ -15,15 +15,22 @@ import io.github.sceneview.node.Node
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.cos
+import kotlin.math.exp
 import kotlin.math.sin
 
 /**
  * Drives all 3D animation by writing transforms onto the nodes captured in [MineWorld].
  * Runs inside SceneView's `onFrame` callback — never triggers recomposition.
+ *
+ * **Smoothing.** The simulation publishes phase progress at 100 ms ticks; raw
+ * rendering of those steps would look steppy at 60 fps. Every sim-driven
+ * motion (miner walks, hoist cart travel, truck trips) is therefore passed
+ * through a frame-rate independent exponential smoother ([smoothTowards]) so
+ * movement reads as continuous and buttery.
  */
 class MineAnimator(
     private val world: MineWorld,
-    private val materials: ColorMaterials,
+    private val materials: ToonMaterials,
 ) {
     private var elapsed = 0.0
     private var lastFrameNanos = 0L
@@ -37,16 +44,24 @@ class MineAnimator(
         lastFrameNanos = frameTimeNanos
         elapsed += dt
 
-        updateShafts(state)
+        updateShafts(state, dt.toFloat())
         updateConveyors(state)
         updateCrusher(state)
         updateBarSilo(state)
-        updateTruck(state)
+        updateTruck(state, dt.toFloat())
     }
+
+    /**
+     * Frame-rate independent exponential smoothing toward a target.
+     * `rate` ~ 14 gives a ~70 ms time constant — enough to hide the 100 ms sim
+     * quantization without adding visible lag.
+     */
+    private fun smoothTowards(current: Float, target: Float, dt: Float, rate: Float = 14f): Float =
+        current + (target - current) * (1f - exp(-rate * dt)).coerceIn(0f, 1f)
 
     // ----------------------------------------------------------------- shafts
 
-    private fun updateShafts(state: GameState) {
+    private fun updateShafts(state: GameState, dt: Float) {
         for (i in 0 until MineWorld.ShaftCount) {
             val shaft = state.shafts[i]
             val nodes = world.shafts[i]
@@ -60,66 +75,64 @@ class MineAnimator(
             val t = elapsed.toFloat()
 
             // Miners: walk between the ore seam (back of trench) and the cart stop.
-            val storage = Economy.shaftStorage(shaft.cartCapacityLevel)
             for (j in 0 until MineWorld.ShaftMinerCount) {
                 val miner = shaft.miners[j]
                 val minerNode = nodes.miners[j] ?: continue
                 val offsetX = (j - 1) * 0.7f
                 val mineX = x + offsetX
-                val mineZ = MineWorld.SHAFT_Z - 0.8f
-                val mineY = -3.62f
                 val dumpX = x + (j - 1) * 0.35f
-                val dumpZ = MineWorld.SHAFT_Z + 0.1f
-                val dumpY = -3.5f
 
-                when (miner.phase) {
+                val (tx, ty, tz) = when (miner.phase) {
                     MinerPhase.MINING -> {
                         val bob = sin(t * 9f + j * 2.1f) * 0.04f
                         val sway = cos(t * 4.5f + j) * 0.03f
-                        minerNode.position = Position(mineX + sway, mineY + bob, mineZ)
+                        Triple(mineX + sway, MineWorld.MINER_MINE_Y + bob, MineWorld.MINER_MINE_Z)
                     }
-                    MinerPhase.HAULING -> {
-                        val p = miner.progress
-                        minerNode.position = Position(
-                            lerp(mineX, dumpX, p),
-                            lerp(mineY, dumpY, p) + sin(t * 12f + j) * 0.02f,
-                            lerp(mineZ, dumpZ, p),
-                        )
-                    }
-                    MinerPhase.RETURNING -> {
-                        val p = miner.progress
-                        minerNode.position = Position(
-                            lerp(dumpX, mineX, p),
-                            lerp(dumpY, mineY, p),
-                            lerp(dumpZ, mineZ, p),
-                        )
-                    }
-                    MinerPhase.IDLE -> {
-                        minerNode.position = Position(mineX, mineY, mineZ)
-                    }
+                    MinerPhase.HAULING -> Triple(
+                        lerp(mineX, dumpX, miner.progress),
+                        lerp(MineWorld.MINER_MINE_Y, MineWorld.MINER_DUMP_Y, miner.progress) +
+                            sin(t * 12f + j) * 0.02f,
+                        lerp(MineWorld.MINER_MINE_Z, MineWorld.MINER_DUMP_Z, miner.progress),
+                    )
+                    MinerPhase.RETURNING -> Triple(
+                        lerp(dumpX, mineX, miner.progress),
+                        lerp(MineWorld.MINER_DUMP_Y, MineWorld.MINER_MINE_Y, miner.progress),
+                        lerp(MineWorld.MINER_DUMP_Z, MineWorld.MINER_MINE_Z, miner.progress),
+                    )
+                    MinerPhase.IDLE -> Triple(mineX, MineWorld.MINER_MINE_Y, MineWorld.MINER_MINE_Z)
                 }
+
+                // Exponential smoothing turns the 100 ms sim steps into
+                // continuous motion at display frame rate.
+                val cur = minerNode.position
+                minerNode.position = Position(
+                    smoothTowards(cur.x, tx, dt),
+                    smoothTowards(cur.y, ty, dt),
+                    smoothTowards(cur.z, tz, dt),
+                )
             }
 
             // Cart: vertical travel in the shaft.
-            val cart = shaft.cart
             nodes.cart?.let { cartNode ->
-                val y = when (cart.phase) {
+                val targetY = when (shaft.cart.phase) {
                     CartPhase.IDLE, CartPhase.UNLOADING -> MineWorld.CART_TOP_Y
-                    CartPhase.DESCENDING -> lerp(MineWorld.CART_TOP_Y, MineWorld.CART_BOTTOM_Y, cart.progress)
+                    CartPhase.DESCENDING -> lerp(MineWorld.CART_TOP_Y, MineWorld.CART_BOTTOM_Y, shaft.cart.progress)
                     CartPhase.LOADING -> MineWorld.CART_BOTTOM_Y
-                    CartPhase.ASCENDING -> lerp(MineWorld.CART_BOTTOM_Y, MineWorld.CART_TOP_Y, cart.progress)
+                    CartPhase.ASCENDING -> lerp(MineWorld.CART_BOTTOM_Y, MineWorld.CART_TOP_Y, shaft.cart.progress)
                 }
-                cartNode.position = Position(x, y, MineWorld.SHAFT_Z)
+                val cur = cartNode.position
+                cartNode.position = Position(x, smoothTowards(cur.y, targetY, dt), MineWorld.SHAFT_Z)
             }
 
             // Ore load stacked on the cart.
             val cartCapacity = Economy.cartCapacity(shaft.cartCapacityLevel)
-            val loadCount = ceil(cart.load / cartCapacity * 4).toInt().coerceIn(0, 4)
+            val loadCount = ceil(shaft.cart.load / cartCapacity * 4).toInt().coerceIn(0, 4)
             for (c in 0 until 4) {
                 nodes.cartLoad[c]?.isVisible = c < loadCount
             }
 
             // Underground stockpile.
+            val storage = Economy.shaftStorage(shaft.cartCapacityLevel)
             val stockCount = ceil(shaft.buffer / storage * 4).toInt().coerceIn(0, 4)
             for (s in 0 until 4) {
                 nodes.stockpile[s]?.isVisible = s < stockCount
@@ -146,9 +159,9 @@ class MineAnimator(
             if (!flowing) continue
             val side = if (i % 2 == 0) -1f else 1f
             val lane = (i / 2).toFloat()
-            val phase = ((t * 1.35f + lane * 2.4f + (i % 2) * 1.2f) % 7.2f)
+            val phase = ((t * 1.35f + lane * 2.4f + (i % 2) * 1.2f) % MineWorld.CROSS_BELT_TRAVEL)
             node.position = Position(
-                side * (7.2f - phase),
+                side * (MineWorld.CROSS_BELT_TRAVEL - phase),
                 MineWorld.CROSS_BELT_Y + 0.17f,
                 MineWorld.CROSS_BELT_Z + (lane - 1f) * 0.18f,
             )
@@ -159,11 +172,11 @@ class MineAnimator(
             val node = world.mainBeltOre[i] ?: continue
             node.isVisible = flowing
             if (!flowing) continue
-            val phase = (t * 1.5f + i * 0.85f) % 2.8f
+            val phase = (t * 1.5f + i * 0.85f) % 2.5f
             node.position = Position(
                 MineWorld.MAIN_BELT_X,
                 MineWorld.MAIN_BELT_Y + 0.17f,
-                3.2f - phase,
+                3.0f - phase,
             )
         }
     }
@@ -213,23 +226,44 @@ class MineAnimator(
 
     // ------------------------------------------------------------------ truck
 
-    private fun updateTruck(state: GameState) {
+    private fun updateTruck(state: GameState, dt: Float) {
         val truck = world.truck ?: return
         val logistics = state.logistics
         val t = elapsed.toFloat()
 
-        val (z, yaw, hop) = when (logistics.phase) {
+        val (targetZ, yaw, hop) = when (logistics.phase) {
             TruckPhase.IDLE, TruckPhase.LOADING ->
-                Triple(MineWorld.TRUCK_LOAD_Z, 0f, abs(sin(t * 18f)) * 0.02f)
+                Triple(MineWorld.TRUCK_LOAD_Z, 0f, abs(sin(t * 10f)) * 0.012f)
             TruckPhase.OUTBOUND ->
-                Triple(lerp(MineWorld.TRUCK_LOAD_Z, MineWorld.MARKET_Z, logistics.progress), 0f, 0f)
+                Triple(lerp(MineWorld.TRUCK_LOAD_Z, MineWorld.TRUCK_SELL_Z, logistics.progress), 0f, 0f)
             TruckPhase.SELLING ->
-                Triple(MineWorld.MARKET_Z, 0f, abs(sin(t * 12f)) * 0.09f)
-            TruckPhase.INBOUND ->
-                Triple(lerp(MineWorld.MARKET_Z, MineWorld.TRUCK_LOAD_Z, logistics.progress), 180f, 0f)
+                Triple(MineWorld.TRUCK_SELL_Z, 0f, abs(sin(t * 8f)) * 0.05f)
+            TruckPhase.INBOUND -> {
+                // Ease the U-turn during the first 30% of the return trip.
+                val turn = (logistics.progress / 0.3f).coerceIn(0f, 1f)
+                val eased = turn * turn * (3f - 2f * turn)
+                Triple(lerp(MineWorld.TRUCK_SELL_Z, MineWorld.TRUCK_LOAD_Z, logistics.progress), 180f * eased, 0f)
+            }
         }
-        truck.position = Position(MineWorld.TRUCK_LOAD_X, hop, z)
+
+        // Smooth the 100 ms sim steps into continuous motion.
+        val cur = truck.position
+        truck.position = Position(
+            MineWorld.TRUCK_LOAD_X,
+            smoothTowards(cur.y, hop, dt, rate = 20f),
+            smoothTowards(cur.z, targetZ, dt),
+        )
         truck.rotation = Rotation(0f, yaw, 0f)
+
+        // Blob shadow glides along under the truck, glued to the road.
+        world.truckShadow?.let { shadow ->
+            val sc = shadow.position
+            shadow.position = Position(
+                MineWorld.TRUCK_LOAD_X,
+                MineWorld.TRUCK_SHADOW_Y,
+                smoothTowards(sc.z, targetZ, dt, rate = 10f),
+            )
+        }
 
         // Cargo bars + their color.
         val loadTotal = logistics.load.values.sum()
