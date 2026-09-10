@@ -84,10 +84,12 @@ app/src/main/java/com/idleshaft/tycoon/
 │   │   ├── GameEngine.kt          100ms tick loop, autosave, event bus
 │   │   └── OfflineEarningsCalculator.kt
 │   └── threed/      # SceneView/Filament scene
-│       ├── MiningScene.kt         SceneView wiring: lights, camera, onFrame loop
+│       ├── MiningScene.kt         SceneView wiring: flat toon sky, MSAA, LINEAR grading, camera
 │       ├── MineSceneContent.kt    procedural low-poly world (no glTF assets!)
 │       ├── MineWorld.kt           animated-node registry + layout constants
-│       └── MineAnimator.kt        per-frame transform animation
+│       ├── MineAnimator.kt        per-frame transform animation (exponential smoothing)
+│       └── ToonMaterials.kt       cel-shaded palette (matc-compiled toon.filamat)
+├── materials/       # (app/src/main/materials) .mat cel-shader sources, matc-compiled at build time
 ├── data/
 │   └── GameRepository.kt         DataStore + JSON save/load
 ├── ui/              # Compose HUD
@@ -99,6 +101,22 @@ app/src/main/java/com/idleshaft/tycoon/
 ```
 
 **Design decisions worth knowing:**
+
+- **Toon rendering pipeline.** All props use a custom cel shader (`app/src/main/materials/toon.mat`),
+  compiled at build time by Filament's `matc` (auto-downloaded by Gradle, cached) into
+  `materials/toon.filamat`: unlit base colour × 3-band posterised light ramp + rim
+  darkening — flat, clean low-poly toon with an inked-silhouette feel. Rendering runs at
+  MSAA 4× + FXAA with fixed resolution, LINEAR tone mapping (palette-exact colours),
+  bloom/SSAO/filmic off, and a flat pastel skybox.
+- **No-clipping layout.** The facility deck is split into strips so the trench footprints
+  stay open (the underground floor, veins, stockpiles and miners are always visible);
+  the cross belt is an elevated bridge whose legs land between shafts; the truck road is
+  offset from the platform/market with clear gaps; overlapping solids are offset so no
+  two faces are coplanar (no z-fighting). The camera's depth range is matched to the world.
+- **Smooth motion.** The simulation publishes phase progress at 100 ms ticks; every
+  sim-driven animation (miner walks, hoist travel, truck trips) passes through a
+  frame-rate independent exponential smoother, so movement is continuous at display
+  frame rate. The truck also eases its U-turn and rides above a toon blob shadow.
 
 - **Declarative scene, imperative animation.** The 3D world is declared once as a
   Compose tree of `CubeNode`/`SphereNode`/… primitives. Animated nodes are captured by
@@ -125,6 +143,10 @@ app/src/main/java/com/idleshaft/tycoon/
 ./gradlew testDebugUnitTest      # JVM unit tests
 ./gradlew assembleRelease        # release build (add your signing config)
 ```
+
+The first build downloads Filament's `matc` shader compiler (~55 MB, cached afterwards
+in `~/.gradle/filament-tools`) and compiles `app/src/main/materials/*.mat` into the
+packaged `.filamat` assets automatically.
 
 The APK lands in `app/build/outputs/apk/debug/app-debug.apk`.
 Requirements: JDK 17+, Android SDK 36. GitHub Actions CI builds the APK on every push

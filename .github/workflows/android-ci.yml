@@ -32,6 +32,12 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Cache Filament matc toolchain
+        uses: actions/cache@v4
+        with:
+          path: ~/.gradle/filament-tools
+          key: filament-tools-1.72.1-matc
+
       - name: Setup Gradle (caching)
         uses: gradle/actions/setup-gradle@v4
 
