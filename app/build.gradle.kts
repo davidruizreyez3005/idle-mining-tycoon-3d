@@ -1,3 +1,5 @@
+import java.net.URI
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -5,16 +7,85 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
+// ---------------------------------------------------------------------------
+// Toon materials: compile .mat sources with Filament's matc at build time.
+// matc is downloaded once from the official Filament GitHub release and cached
+// in GRADLE_USER_HOME/filament-tools (so CI caches it via setup-gradle).
+// ---------------------------------------------------------------------------
+val filamentToolsVersion = "1.72.1" // must match SceneView's Filament dependency
+val matcBinary = File(
+    File(gradle.gradleUserHomeDir, "filament-tools/filament"),
+    "bin/matc",
+)
+val materialsSrcDir = layout.projectDirectory.dir("src/main/materials")
+val materialsOutDir = "build/generated/toonAssets"
+
+tasks.register("downloadFilamentMatc") {
+    description = "Downloads matc from the Filament release (cached in Gradle user home)."
+    outputs.file(matcBinary)
+    doLast {
+        if (!matcBinary.isFile) {
+            val tgz = File(temporaryDir, "filament-tools.tgz")
+            logger.lifecycle("Downloading Filament $filamentToolsVersion tools (matc)…")
+            URI(
+                "https://github.com/google/filament/releases/download/" +
+                    "v$filamentToolsVersion/filament-v$filamentToolsVersion-linux.tgz"
+            ).toURL().openStream().use { input ->
+                tgz.outputStream().use { input.copyTo(it) }
+            }
+            matcBinary.parentFile.parentFile.mkdirs()
+            exec {
+                commandLine("tar", "-xzf", tgz.absolutePath, "-C", matcBinary.parentFile.parentFile.absolutePath)
+            }
+            matcBinary.setExecutable(true)
+            logger.lifecycle("matc installed at ${matcBinary.absolutePath}")
+        }
+    }
+}
+
+tasks.register("compileToonMaterials") {
+    description = "Compiles app/src/main/materials/*.mat into packaged .filamat assets."
+    dependsOn("downloadFilamentMatc")
+    inputs.dir(materialsSrcDir)
+    outputs.dir(layout.projectDirectory.dir(materialsOutDir))
+    doLast {
+        // Outputs land in build/generated/toonAssets/materials/ — matching the
+        // asset path "materials/<name>.filamat" used by ToonMaterials.
+        val outDir = File(projectDir, materialsOutDir).resolve("materials").apply { mkdirs() }
+        val matFiles = materialsSrcDir.asFile.listFiles { f -> f.extension == "mat" }.orEmpty()
+        if (matFiles.isEmpty()) throw GradleException("No .mat sources found in ${materialsSrcDir}")
+        matFiles.forEach { mat ->
+            val out = File(outDir, mat.nameWithoutExtension + ".filamat")
+            logger.lifecycle("matc: ${mat.name} -> ${out.relativeTo(projectDir)}")
+            exec {
+                commandLine(
+                    matcBinary.absolutePath,
+                    "--platform", "mobile",
+                    "--api", "all",
+                    "-o", out.absolutePath,
+                    mat.absolutePath,
+                )
+            }
+        }
+    }
+}
+
 android {
     namespace = "com.idleshaft.tycoon"
     compileSdk = 36
+
+    sourceSets {
+        getByName("main") {
+            assets.srcDir(materialsOutDir)
+        }
+    }
 
     defaultConfig {
         applicationId = "com.idleshaft.tycoon"
         minSdk = 24
         targetSdk = 36
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = 3
+        versionName = "1.2.0"
     }
 
     buildTypes {
@@ -51,6 +122,12 @@ kotlin {
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
+}
+
+// Compile the toon .mat sources before any build variant starts (skipped when
+// up-to-date via the task's declared inputs/outputs).
+tasks.named("preBuild") {
+    dependsOn("compileToonMaterials")
 }
 
 dependencies {

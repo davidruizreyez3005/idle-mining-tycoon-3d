@@ -1,0 +1,13 @@
+material {
+    name : toonShadow,
+    shadingModel : unlit,
+    blending : transparent,
+    depthWrite : false,
+    culling : back,
+}
+fragment {
+    void material(inout MaterialInputs material) {
+        prepareMaterial(material);
+        material.baseColor = vec4(0.06, 0.08, 0.10, 0.22);
+    }
+}

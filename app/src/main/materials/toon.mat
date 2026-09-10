@@ -1,0 +1,31 @@
+material {
+    name : toon,
+    parameters : [
+        { type : float4, name : baseColor }
+    ],
+    shadingModel : unlit,
+    culling : back,
+}
+fragment {
+    void material(inout MaterialInputs material) {
+        prepareMaterial(material);
+        // Flat per-face geometric normal from screen-space derivatives:
+        // the heart of the low-poly toon look.
+        vec3 p = getWorldPosition();
+        vec3 V = normalize(getWorldCameraPosition() - p);
+        vec3 n = normalize(cross(dFdx(p), dFdy(p)));
+        n *= sign(dot(n, V) + 1e-6);   // make front faces point at the camera
+        // Fixed stylised "sun" — mostly overhead with a camera-side bias so
+        // top / front / side faces of every cube land in different bands.
+        vec3 L = normalize(vec3(0.28, 0.90, 0.20));
+        float ndl = dot(n, L);
+        // 3-band cel ramp with feathered edges (no jaggies between bands).
+        float band1 = smoothstep(0.00, 0.04, ndl);
+        float band2 = smoothstep(0.28, 0.32, ndl);
+        float shade = 0.64 + 0.17 * band1 + 0.19 * band2;
+        // Rim darkening: a cheap inked-outline feel at silhouettes.
+        float rim = 1.0 - clamp(dot(n, V), 0.0, 1.0);
+        shade *= 1.0 - 0.30 * smoothstep(0.70, 0.82, rim);
+        material.baseColor = vec4(materialParams.baseColor.rgb * shade, materialParams.baseColor.a);
+    }
+}
