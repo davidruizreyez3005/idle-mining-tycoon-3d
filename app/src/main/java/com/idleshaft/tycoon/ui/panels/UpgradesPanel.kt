@@ -13,7 +13,6 @@ import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Warehouse
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -97,10 +96,11 @@ fun UpgradesPanel(
         item {
             PanelCard {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Surface(
-                        shape = androidx.compose.foundation.shape.CircleShape,
-                        color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f),
-                    ) {}
+                    androidx.compose.material3.Icon(
+                        Icons.Filled.Bolt,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.secondary,
+                    )
                     Column(modifier = Modifier.weight(1f)) {
                         Text("Gem Boost", style = MaterialTheme.typography.titleMedium)
                         Text(
@@ -110,12 +110,6 @@ fun UpgradesPanel(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    androidx.compose.material3.Icon(
-                        Icons.Filled.Bolt,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.secondary,
-                        modifier = Modifier.padding(end = 4.dp),
-                    )
                     BuyButton(
                         text = "${Economy.BOOST_GEM_COST} gems",
                         enabled = state.gems >= Economy.BOOST_GEM_COST,

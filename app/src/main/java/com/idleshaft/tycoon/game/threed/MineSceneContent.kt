@@ -5,16 +5,9 @@ import androidx.compose.runtime.remember
 import com.google.android.filament.MaterialInstance
 import com.idleshaft.tycoon.domain.OreType
 import io.github.sceneview.SceneScope
-import io.github.sceneview.geometries.Cube
-import io.github.sceneview.geometries.Cone
 import io.github.sceneview.loaders.MaterialLoader
 import io.github.sceneview.math.Position
 import io.github.sceneview.math.Size
-import io.github.sceneview.node.CubeNode
-import io.github.sceneview.node.CylinderNode
-import io.github.sceneview.node.SphereNode
-import io.github.sceneview.node.ConeNode
-import io.github.sceneview.node.Node
 
 /** Creates (and caches) one lit [MaterialInstance] per palette color. */
 class ColorMaterials(private val loader: MaterialLoader) {

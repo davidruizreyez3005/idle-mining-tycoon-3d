@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.idleshaft.tycoon.domain.Economy
 import com.idleshaft.tycoon.domain.GameState
+import androidx.compose.foundation.layout.Box
 
 /**
  * The top HUD: cash balance, gem count, net income rate and (while active) the
