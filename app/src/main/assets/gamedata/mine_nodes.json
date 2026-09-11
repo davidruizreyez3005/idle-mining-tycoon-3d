@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "nodeTypes": [
+    {
+      "id": "stone_vein",
+      "name": "Stone Vein",
+      "mesh": "rock_small",
+      "hp": 100,
+      "respawnSeconds": 15,
+      "yields": { "stone": 3 },
+      "primaryResource": "stone",
+      "scale": 1.0,
+      "crystals": 3
+    },
+    {
+      "id": "coal_vein",
+      "name": "Coal Seam",
+      "mesh": "rock_large",
+      "hp": 140,
+      "respawnSeconds": 24,
+      "yields": { "coal": 2, "stone": 1 },
+      "primaryResource": "coal",
+      "scale": 1.1,
+      "crystals": 4
+    },
+    {
+      "id": "iron_vein",
+      "name": "Iron Deposit",
+      "mesh": "rock_large",
+      "hp": 200,
+      "respawnSeconds": 34,
+      "yields": { "iron": 2, "stone": 1 },
+      "primaryResource": "iron",
+      "scale": 1.15,
+      "crystals": 4
+    },
+    {
+      "id": "gold_vein",
+      "name": "Gold Vein",
+      "mesh": "rock_boulder",
+      "hp": 320,
+      "respawnSeconds": 50,
+      "yields": { "gold": 1, "stone": 2 },
+      "primaryResource": "gold",
+      "scale": 1.3,
+      "crystals": 5
+    }
+  ]
+}

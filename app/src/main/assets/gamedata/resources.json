@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "resources": [
+    {
+      "id": "stone",
+      "name": "Stone",
+      "rarity": "common",
+      "baseValue": 2,
+      "color": "#B0BEC5",
+      "icon": "stone"
+    },
+    {
+      "id": "coal",
+      "name": "Coal",
+      "rarity": "uncommon",
+      "baseValue": 6,
+      "color": "#37474F",
+      "icon": "coal"
+    },
+    {
+      "id": "iron",
+      "name": "Iron",
+      "rarity": "uncommon",
+      "baseValue": 16,
+      "color": "#C58A5A",
+      "icon": "iron"
+    },
+    {
+      "id": "gold",
+      "name": "Gold",
+      "rarity": "rare",
+      "baseValue": 45,
+      "color": "#FFD54F",
+      "icon": "gold"
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+# Built artifacts
+*.apk
+*.aab
+.gradle/
+build/
+app/build/
+local.properties
+
+# IDE
+.idea/
+*.iml
+.DS_Store
+
+# Secrets — never commit credentials of any kind.
+.secrets/
+ghp_*
+*_PAT*
+*.keystore
+*.jks
+
+# Android
+.cxx/
+captures/
+.externalNativeBuild/

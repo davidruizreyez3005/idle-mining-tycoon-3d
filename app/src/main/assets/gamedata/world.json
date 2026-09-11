@@ -1,0 +1,80 @@
+{
+  "version": 1,
+  "zone": "greenfield_quarry",
+  "name": "Greenfield Quarry",
+  "ground": {
+    "size": [46, 46],
+    "grassColor": "#7CB342",
+    "dirtColor": "#A1887F",
+    "rockColor": "#78909C",
+    "pathWidth": 4.2
+  },
+  "camera": {
+    "orbitRadius": 16.5,
+    "target": [0, 0.8, -4]
+  },
+  "spawn": [0, 8],
+  "cliff": {
+    "z": -19,
+    "halfSpan": 14,
+    "height": 5,
+    "depth": 4,
+    "entranceHalfWidth": 3.4,
+    "wallColor": "#6D838F"
+  },
+  "nodes": [
+    { "typeId": "stone_vein", "at": [-12, -12.5] },
+    { "typeId": "stone_vein", "at": [-7.5, -14.5], "scale": 0.92 },
+    { "typeId": "stone_vein", "at": [0, -13.2], "scale": 1.08 },
+    { "typeId": "stone_vein", "at": [7.5, -14.5], "scale": 0.95 },
+    { "typeId": "stone_vein", "at": [12, -12.5], "scale": 1.04 },
+    { "typeId": "coal_vein", "at": [-4.6, -16.4], "scale": 1.0 },
+    { "typeId": "coal_vein", "at": [4.6, -16.4], "scale": 0.96 },
+    { "typeId": "coal_vein", "at": [13.4, -16.6], "scale": 1.05 },
+    { "typeId": "iron_vein", "at": [-2.2, -19.3], "scale": 1.0 },
+    { "typeId": "iron_vein", "at": [2.2, -19.3], "scale": 1.0 },
+    { "typeId": "gold_vein", "at": [0, -20.3], "scale": 1.15 }
+  ],
+  "depot": {
+    "position": [0, 12.5],
+    "facing": 0
+  },
+  "props": [
+    { "piece": "tree_pine", "at": [-19, -3], "scale": 1.1 },
+    { "piece": "tree_pine", "at": [-20.5, 2], "scale": 0.9 },
+    { "piece": "tree_pine", "at": [19, -2], "scale": 1.05 },
+    { "piece": "tree_pine", "at": [20, 4], "scale": 0.95 },
+    { "piece": "tree_pine", "at": [-13, 18.5], "scale": 1.15 },
+    { "piece": "tree_pine", "at": [13, 18.5], "scale": 1.0 },
+    { "piece": "tree_pine", "at": [0, 21.5], "scale": 1.2 },
+    { "piece": "tree_pine", "at": [-19, 13.5], "scale": 0.9 },
+    { "piece": "tree_pine", "at": [18, 10], "scale": 1.1 },
+    { "piece": "tree_round", "at": [-6, 20.3], "scale": 1.05 },
+    { "piece": "tree_round", "at": [7, 20.5], "scale": 0.95 },
+    { "piece": "tree_round", "at": [-18, 8], "scale": 1.0 },
+    { "piece": "tree_round", "at": [20, -6], "scale": 1.1 },
+    { "piece": "tree_round", "at": [-19, -8], "scale": 0.9 },
+    { "piece": "rock_scatter", "at": [-16, 4], "scale": 1.1 },
+    { "piece": "rock_scatter", "at": [16, 3], "scale": 0.9 },
+    { "piece": "rock_scatter", "at": [-15, -4], "scale": 1.0 },
+    { "piece": "rock_scatter", "at": [15, -6], "scale": 1.15 },
+    { "piece": "rock_scatter", "at": [-4, 17], "scale": 0.8 },
+    { "piece": "rock_scatter", "at": [5, 18], "scale": 1.0 },
+    { "piece": "rock_scatter", "at": [10, -8], "scale": 0.85 },
+    { "piece": "rock_scatter", "at": [-10, -8.5], "scale": 1.05 },
+    { "piece": "fence", "at": [-3.1, 8], "rotation": 90 },
+    { "piece": "fence", "at": [-3.1, 4], "rotation": 90 },
+    { "piece": "fence", "at": [-3.1, 0], "rotation": 90 },
+    { "piece": "fence", "at": [-3.1, -4], "rotation": 90 },
+    { "piece": "fence", "at": [3.1, 8], "rotation": 90 },
+    { "piece": "fence", "at": [3.1, 4], "rotation": 90 },
+    { "piece": "fence", "at": [3.1, 0], "rotation": 90 },
+    { "piece": "fence", "at": [3.1, -4], "rotation": 90 },
+    { "piece": "crate", "at": [-3.9, 11.0], "scale": 1.0 },
+    { "piece": "crate", "at": [3.9, 11.2], "scale": 0.9 },
+    { "piece": "crate", "at": [-2.9, 10.2], "scale": 0.8 },
+    { "piece": "barrel", "at": [4.7, 12.8], "scale": 1.0 },
+    { "piece": "lamp", "at": [-3.3, 6.5] },
+    { "piece": "lamp", "at": [3.3, -11.5] }
+  ]
+}

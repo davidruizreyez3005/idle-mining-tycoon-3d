@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "upgrades": [
+    {
+      "id": "pickaxe",
+      "name": "Reinforced Pickaxe",
+      "desc": "Swing harder — mining speed +35% per level.",
+      "effect": { "type": "miningSpeed", "perLevel": 0.35 },
+      "baseCost": 60,
+      "costGrowth": 1.9,
+      "maxLevel": 10,
+      "category": "tools"
+    },
+    {
+      "id": "boots",
+      "name": "Speed Boots",
+      "desc": "Grippy soles — movement speed +18% per level.",
+      "effect": { "type": "moveSpeed", "perLevel": 0.18 },
+      "baseCost": 45,
+      "costGrowth": 1.75,
+      "maxLevel": 8,
+      "category": "tools"
+    },
+    {
+      "id": "backpack",
+      "name": "Big Backpack",
+      "desc": "Carry 6 more resources per level before selling.",
+      "effect": { "type": "backpack", "perLevel": 6.0 },
+      "baseCost": 50,
+      "costGrowth": 1.7,
+      "maxLevel": 10,
+      "category": "logistics"
+    },
+    {
+      "id": "market",
+      "name": "Trade Contracts",
+      "desc": "Better prices — all resources sell for +15% per level.",
+      "effect": { "type": "sellMargin", "perLevel": 0.15 },
+      "baseCost": 120,
+      "costGrowth": 2.0,
+      "maxLevel": 10,
+      "category": "economy"
+    },
+    {
+      "id": "extractor",
+      "name": "Auto-Extractor",
+      "desc": "A little machine keeps digging while you are away. Stone per second scales with level; coal unlocks at level 4.",
+      "effect": {
+        "type": "idleExtraction",
+        "rates": [
+          { "resource": "stone", "perLevel": 0.4, "unlockLevel": 1 },
+          { "resource": "coal", "perLevel": 0.15, "unlockLevel": 4 }
+        ]
+      },
+      "baseCost": 150,
+      "costGrowth": 2.1,
+      "maxLevel": 12,
+      "category": "automation"
+    }
+  ]
+}

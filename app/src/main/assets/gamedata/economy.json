@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "start": {
+    "money": 25,
+    "backpack": 12
+  },
+  "worker": {
+    "moveSpeed": 2.4,
+    "mineDps": 22,
+    "collectRadius": 1.5,
+    "reachRadius": 1.8
+  },
+  "sell": {
+    "depotRadius": 3.0
+  },
+  "idle": {
+    "offlineCapHours": 4
+  }
+}
