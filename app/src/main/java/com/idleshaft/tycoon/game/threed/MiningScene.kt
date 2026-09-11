@@ -83,10 +83,12 @@ fun MiningScene(
         // Authored world coordinates are final — do not re-center the content.
         autoCenterContent = false,
         cameraNode = cameraNode,
-        // Isometric-style 3/4 view centered on the facility, with gestures.
+        // 3/4 overview (~39° elevation) from the market side: the 28 mm default
+        // lens keeps a 65° horizontal FOV, so all four shafts fit even in
+        // portrait; every open-top, open-front pit is fully readable.
         cameraManipulator = rememberCameraManipulator(
-            orbitRadius = 17f,
-            targetPosition = Position(0f, 1.0f, -1.5f),
+            orbitHomePosition = Position(0f, 15.5f, 18.5f),
+            targetPosition = Position(0f, -0.8f, -2f),
         ),
         // The whole world is unlit toon — no scene lights, no shadow passes.
         mainLightNode = null,
