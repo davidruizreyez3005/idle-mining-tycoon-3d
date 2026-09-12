@@ -54,7 +54,7 @@ fun HintOverlay(
                     color = MaterialTheme.colorScheme.primary,
                 )
                 HintLine("TAP A ROCK", "Your worker walks over and mines it.")
-                HintLine("TAP THE GROUND", "Walk anywhere — drag to orbit, pinch to zoom.")
+                HintLine("TAP THE GROUND", "Walk anywhere — the camera follows you automatically.")
                 HintLine("SELL AT THE DEPOT", "The market stall with the spinning coin.")
                 HintLine("BUY UPGRADES", "Mine faster, carry more, automate everything.")
 

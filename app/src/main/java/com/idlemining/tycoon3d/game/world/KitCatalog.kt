@@ -148,6 +148,48 @@ class KitMaterials(
 ) {
     private val cache = HashMap<KitColor, MaterialInstance>()
 
+    /**
+     * PBR surface finish per palette key — Phase 2. The base color comes from
+     * the palette; these parameters give every material a distinct physical
+     * personality under the sun + sky fill: brushed metal for steel, near-mirror
+     * for gold, chalky matte for rock, low-luster for wood.
+     */
+    private data class Surface(
+        val metallic: Float = 0f,
+        val roughness: Float = 0.85f,
+        val reflectance: Float = 0.04f,
+        /** Unlit materials ignore lighting (used for glowing lamp filaments). */
+        val unlit: Boolean = false,
+    )
+
+    private val surfaces = mapOf(
+        KitColor.GRASS to Surface(roughness = 1f, reflectance = 0f),
+        KitColor.DIRT to Surface(roughness = 1f, reflectance = 0f),
+        KitColor.ROCK to Surface(roughness = 0.92f, reflectance = 0.02f),
+        KitColor.CLIFF to Surface(roughness = 0.88f, reflectance = 0.03f),
+        KitColor.TRUNK to Surface(roughness = 0.9f, reflectance = 0.02f),
+        KitColor.FOLIAGE_A to Surface(roughness = 0.95f, reflectance = 0.01f),
+        KitColor.FOLIAGE_B to Surface(roughness = 0.95f, reflectance = 0.01f),
+        KitColor.WOOD to Surface(roughness = 0.8f, reflectance = 0.05f),
+        KitColor.WOOD_DARK to Surface(roughness = 0.75f, reflectance = 0.05f),
+        KitColor.STEEL to Surface(metallic = 1f, roughness = 0.34f, reflectance = 0.5f),
+        KitColor.STEEL_DARK to Surface(metallic = 1f, roughness = 0.46f, reflectance = 0.5f),
+        KitColor.MACHINE to Surface(metallic = 0.85f, roughness = 0.55f, reflectance = 0.4f),
+        KitColor.RED to Surface(roughness = 0.6f, reflectance = 0.06f),
+        KitColor.CANVAS to Surface(roughness = 0.9f, reflectance = 0.03f),
+        KitColor.GOLD to Surface(metallic = 1f, roughness = 0.22f, reflectance = 0.6f),
+        KitColor.LAMP_GLOW to Surface(unlit = true),
+        KitColor.DARK to Surface(roughness = 0.95f, reflectance = 0f),
+        KitColor.TUNNEL to Surface(roughness = 1f, reflectance = 0f),
+        KitColor.WORKER_BODY to Surface(roughness = 0.7f, reflectance = 0.05f),
+        KitColor.WORKER_SKIN to Surface(roughness = 0.55f, reflectance = 0.04f),
+        KitColor.WORKER_HELMET to Surface(roughness = 0.45f, reflectance = 0.08f),
+        KitColor.PICKAXE to Surface(metallic = 1f, roughness = 0.3f, reflectance = 0.55f),
+    )
+
+    /** Ore crystals: polished-gem sparkle (low roughness, high reflectance). */
+    private val crystal = Surface(metallic = 0.05f, roughness = 0.16f, reflectance = 0.35f)
+
     private val fixed = mapOf(
         KitColor.TRUNK to 0xFF795548L,
         KitColor.FOLIAGE_A to 0xFF388E3CL,
@@ -177,10 +219,26 @@ class KitMaterials(
             KitColor.CLIFF -> content.cliffArgb
             else -> fixed[color] ?: 0xFF90A4AEL
         }
-        loader.createColorInstance(argb.toInt())
+        val surface = surfaces[color] ?: Surface()
+        if (surface.unlit) {
+            // Unlit + bloom threshold = a lamp that genuinely glows.
+            loader.createUnlitColorInstance(argb.toInt())
+        } else {
+            loader.createColorInstance(
+                color = argb.toInt(),
+                metallic = surface.metallic,
+                roughness = surface.roughness,
+                reflectance = surface.reflectance,
+            )
+        }
     }
 
     fun of(argb: Long): MaterialInstance = loader.createColorInstance(argb.toInt())
 
-    fun resource(resourceId: String): MaterialInstance = of(content.resourceArgb(resourceId))
+    fun resource(resourceId: String): MaterialInstance = loader.createColorInstance(
+        color = content.resourceArgb(resourceId).toInt(),
+        metallic = crystal.metallic,
+        roughness = crystal.roughness,
+        reflectance = crystal.reflectance,
+    )
 }

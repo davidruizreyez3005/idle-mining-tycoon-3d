@@ -20,6 +20,9 @@ import kotlin.math.ceil
 import kotlin.math.cos
 import kotlin.math.sin
 
+/** Golden angle in radians — irrational spacing kills visible rows in scatter rings. */
+private const val GOLDEN_ANGLE = 2.399963f
+
 /**
  * Builds the entire 3D zone from `world.json` data — ground, dirt path, cliff
  * wall with the mine entrance, every prop placement, the mine nodes with their
@@ -37,6 +40,7 @@ fun SceneScope.WorldBuilder(
     val world = content.world
 
     Ground(content, mats, registry)
+    Backdrop(content, mats)
     CliffWall(content, mats)
     MineEntrance(content, mats, refs, registry)
     Props(content, mats)
@@ -82,6 +86,61 @@ private fun SceneScope.Ground(
         materialInstance = mats.of(KitColor.DIRT),
         position = Position(0f, 0.015f, w.cliff.z + w.cliff.depth / 2 + 3.2f),
     )
+}
+
+// ------------------------------------------------------------------ backdrop
+
+/**
+ * Far-field dressing that gives the quarry its sense of depth — Phase 2:
+ * a wide grass apron under everything, a ragged ring of trees just past the
+ * playfield edge, and hazy mountain silhouettes on the horizon. The distance
+ * fog (see `visuals.fog`) is what turns these layers into atmosphere.
+ */
+@Composable
+private fun SceneScope.Backdrop(content: GameContent, mats: KitMaterials) {
+    val halfX = content.world.ground.size[0] / 2f
+    val halfZ = content.world.ground.size[1] / 2f
+
+    // Apron — a huge plate just below the playfield so the world reads as
+    // continuous ground to the horizon instead of a floating island.
+    CubeNode(
+        size = Size(130f, 0.5f, 130f),
+        materialInstance = mats.of(KitColor.GRASS),
+        position = Position(0f, -0.28f, 0f),
+    )
+
+    // Tree ring — golden-angle scatter to avoid visible rows; a wall of
+    // forest silhouettes framing the playable area.
+    val ringCount = 46
+    for (i in 0 until ringCount) {
+        val angle = i * GOLDEN_ANGLE
+        val radius = maxOf(halfX, halfZ) + 3.2f + (i % 4) * 1.5f
+        val x = (cos(angle) * radius)
+        val z = (sin(angle) * radius)
+        val scale = 1.75f + (i % 5) * 0.25f
+        val piece = if (i % 3 == 0) "tree_pine" else "tree_round"
+        PlacePiece(piece, x, z, scale, angle * 57.3f, mats)
+    }
+
+    // Distant mountains — low-poly cones on the horizon, deliberately huge
+    // (12-18 m) so the fog has mass to catch. Sunk slightly into the apron.
+    val mountainCount = 9
+    for (i in 0 until mountainCount) {
+        val angle = i * (2f * Math.PI.toFloat() / mountainCount) + 0.42f
+        val radius = maxOf(halfX, halfZ) + 27f + (i % 3) * 7f
+        val height = 13f + (i % 4) * 2.6f
+        val base = 10f + (i % 3) * 3.4f
+        ConeNode(
+            radius = base,
+            height = height,
+            materialInstance = mats.of(KitColor.CLIFF),
+            position = Position(
+                (cos(angle) * radius),
+                height / 2f - 0.6f,
+                (sin(angle) * radius),
+            ),
+        )
+    }
 }
 
 // ---------------------------------------------------------------------- cliff

@@ -49,30 +49,33 @@ jobs:
           retention-days: 14
 
       # ------------------------------------------------------------------ release
-      # Runs only on pushes to main. Recreates the v0.1.0 release each time so
-      # there is always exactly one canonical "latest vertical slice" build.
-      # Uses the built-in GITHUB_TOKEN — no personal credentials in CI.
+      # Runs only on pushes to main. Recreates the v0.2.0 release each time so
+      # there is always exactly one canonical "latest" build. Uses the built-in
+      # GITHUB_TOKEN — no personal credentials in CI.
       - name: Publish release
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: v0.1.0
+          TAG: v0.2.0
         run: |
           set -e
-          cp app/build/outputs/apk/release/app-release.apk MiningTycoon3D-v0.1.0.apk
+          cp app/build/outputs/apk/release/app-release.apk MiningTycoon3D-v0.2.0.apk
           # Replace any previous release at this tag (idempotent re-publish).
           gh release delete "$TAG" --yes --cleanup-tag 2>/dev/null || true
           gh release create "$TAG" \
-            --title "Mining Tycoon 3D — Vertical Slice v0.1.0" \
+            --title "Mining Tycoon 3D — Phase 2 v0.2.0" \
             --notes "Automated build from $GITHUB_SHA (run $GITHUB_RUN_NUMBER).
 
-          **Install:** download \`MiningTycoon3D-v0.1.0.apk\` below, allow installs from your browser, and play.
+          **Install:** download \`MiningTycoon3D-v0.2.0.apk\` below, allow installs from your browser, and play.
 
-          - 3D Greenfield Quarry — mine, haul and sell in a full touch-driven 3D scene
-          - 4 resources (stone, coal, iron, gold), 11 veins, respawning nodes
-          - Controllable worker with tap-to-move / tap-to-mine
-          - 5 data-driven upgrades incl. the idle Auto-Extractor
-          - Idle offline earnings (4h cap) with a welcome-back report
-          - Versioned saves with autosave" \
+          **Phase 2 — cinematic presentation:**
+          - Fixed cinematic camera (authored angle, soft worker follow — no more gesture orbit)
+          - Warm sun + cool sky fill with soft 2048px shadows
+          - Distance fog with sun in-scattering and mountain backdrop — real depth
+          - PBR materials: metallic steel/gold, matte rock, polished ore crystals
+          - ACES tone mapping, bloom, vignette and SSAO
+          - All presentation data-driven from world.json (per-zone moods)
+
+          Plus the full vertical slice: 4 resources, 11 veins, upgrades, idle earnings, saves." \
             --latest \
-            "MiningTycoon3D-v0.1.0.apk"
+            "MiningTycoon3D-v0.2.0.apk"

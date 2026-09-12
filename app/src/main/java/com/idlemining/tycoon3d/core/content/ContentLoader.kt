@@ -1,6 +1,7 @@
 package com.idlemining.tycoon3d.core.content
 
 import kotlinx.serialization.json.Json
+import kotlin.math.sqrt
 
 /**
  * Thrown when a gamedata JSON file is structurally invalid or references content
@@ -131,7 +132,51 @@ object ContentLoader {
         parseColor(file.ground.dirtColor, "ground.dirtColor")
         parseColor(file.ground.rockColor, "ground.rockColor")
         parseColor(file.cliff.wallColor, "cliff.wallColor")
+        validateCamera(file.camera)
+        validateVisuals(file.visuals)
         return file
+    }
+
+    private fun validateCamera(cam: CameraDef) {
+        if (cam.target.size != 3) throw ContentException("world.json: camera.target must be [x, y, z]")
+        if (cam.distance <= 0f) throw ContentException("world.json: camera.distance must be positive")
+        if (cam.fov <= 0f || cam.fov >= 180f) throw ContentException("world.json: camera.fov must be in (0, 180)")
+        if (cam.followStrength < 0f || cam.followStrength > 1f) {
+            throw ContentException("world.json: camera.followStrength must be in [0, 1]")
+        }
+        if (cam.followDeadzone < 0f) throw ContentException("world.json: camera.followDeadzone must be >= 0")
+        if (cam.followRangeX < 0f || cam.followRangeZ < 0f) {
+            throw ContentException("world.json: camera follow ranges must be >= 0")
+        }
+    }
+
+    private fun validateVisuals(v: VisualsDef) {
+        val toneMappings = setOf("aces", "filmic", "linear")
+        if (v.toneMapping !in toneMappings) {
+            throw ContentException("world.json: visuals.toneMapping must be one of $toneMappings")
+        }
+        validateDirection(v.sun.direction, "visuals.sun.direction")
+        validateDirection(v.fill.direction, "visuals.fill.direction")
+        if (v.sun.intensity < 0f) throw ContentException("world.json: visuals.sun.intensity must be >= 0")
+        if (v.fill.intensity < 0f) throw ContentException("world.json: visuals.fill.intensity must be >= 0")
+        if (v.ambient.intensity < 0f) throw ContentException("world.json: visuals.ambient.intensity must be >= 0")
+        if (v.fog.density < 0f) throw ContentException("world.json: visuals.fog.density must be >= 0")
+        if (v.fog.cutOffDistance <= 0f) throw ContentException("world.json: visuals.fog.cutOffDistance must be positive")
+        val mapSize = v.sun.shadowMapSize
+        if (mapSize < 256 || mapSize > 4096 || (mapSize and (mapSize - 1)) != 0) {
+            throw ContentException("world.json: visuals.sun.shadowMapSize must be a power of two in [256, 4096]")
+        }
+        parseColor(v.sun.color, "visuals.sun.color")
+        parseColor(v.fill.color, "visuals.fill.color")
+        parseColor(v.sky.color, "visuals.sky.color")
+        parseColor(v.fog.color, "visuals.fog.color")
+    }
+
+    /** Direction vectors must have exactly 3 components and a usable length. */
+    private fun validateDirection(dir: List<Float>, what: String) {
+        if (dir.size != 3) throw ContentException("world.json: $what must be [x, y, z]")
+        val len = sqrt(dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2])
+        if (len < 1e-4f) throw ContentException("world.json: $what must not be a zero vector")
     }
 
     /** Parses "#RRGGBB" into an opaque ARGB long. */

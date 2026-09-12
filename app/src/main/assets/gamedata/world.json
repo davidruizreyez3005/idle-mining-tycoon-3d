@@ -10,8 +10,48 @@
     "pathWidth": 4.2
   },
   "camera": {
-    "orbitRadius": 16.5,
-    "target": [0, 0.8, -4]
+    "yaw": 31,
+    "pitch": 33,
+    "distance": 21.5,
+    "fov": 42,
+    "target": [0, 0.6, -4.5],
+    "followStrength": 0.18,
+    "followDeadzone": 3.2,
+    "followRangeX": 10,
+    "followRangeZ": 8
+  },
+  "visuals": {
+    "sun": {
+      "color": "#FFF1D6",
+      "intensity": 26000,
+      "direction": [-0.42, -0.78, 0.46],
+      "angularRadius": 1.9,
+      "shadowMapSize": 2048
+    },
+    "fill": {
+      "color": "#AECBEB",
+      "intensity": 5200,
+      "direction": [0.5, -0.32, -0.8]
+    },
+    "ambient": { "intensity": 9000 },
+    "sky": { "color": "#9EC9EC" },
+    "fog": {
+      "enabled": true,
+      "density": 0.012,
+      "distance": 0.5,
+      "cutOffDistance": 85,
+      "maximumOpacity": 0.7,
+      "heightFalloff": 0.04,
+      "color": "#CFE0F2",
+      "inScatteringStart": 6,
+      "inScatteringSize": 32
+    },
+    "bloom": { "enabled": true, "strength": 0.2 },
+    "vignette": { "enabled": true, "midPoint": 0.45, "roundness": 0.5, "feather": 0.55 },
+    "toneMapping": "aces",
+    "exposure": 1.06,
+    "contrast": 1.06,
+    "saturation": 1.1
   },
   "spawn": [0, 8],
   "cliff": {
@@ -75,6 +115,28 @@
     { "piece": "crate", "at": [-2.9, 10.2], "scale": 0.8 },
     { "piece": "barrel", "at": [4.7, 12.8], "scale": 1.0 },
     { "piece": "lamp", "at": [-3.3, 6.5] },
-    { "piece": "lamp", "at": [3.3, -11.5] }
+    { "piece": "lamp", "at": [3.3, -11.5] },
+    { "piece": "grass_tuft", "at": [-8.5, 2.5], "scale": 1.2 },
+    { "piece": "grass_tuft", "at": [9.2, 1.8], "scale": 1.0 },
+    { "piece": "grass_tuft", "at": [-11.5, -2.0], "scale": 0.9 },
+    { "piece": "grass_tuft", "at": [12.3, -4.5], "scale": 1.1 },
+    { "piece": "grass_tuft", "at": [-5.6, 6.8], "scale": 0.85 },
+    { "piece": "grass_tuft", "at": [6.4, 7.5], "scale": 1.05 },
+    { "piece": "grass_tuft", "at": [-14.2, 7.5], "scale": 1.0 },
+    { "piece": "grass_tuft", "at": [14.8, 8.8], "scale": 0.95 },
+    { "piece": "grass_tuft", "at": [-2.2, -6.5], "scale": 0.9 },
+    { "piece": "grass_tuft", "at": [2.6, -5.8], "scale": 1.0 },
+    { "piece": "grass_tuft", "at": [-16.5, -7.5], "scale": 1.1 },
+    { "piece": "grass_tuft", "at": [16.2, -9.0], "scale": 0.9 },
+    { "piece": "grass_tuft", "at": [-8.0, 12.5], "scale": 1.0 },
+    { "piece": "grass_tuft", "at": [8.5, 13.2], "scale": 1.15 },
+    { "piece": "grass_tuft", "at": [-4.8, 15.0], "scale": 0.9 },
+    { "piece": "grass_tuft", "at": [5.2, 16.2], "scale": 1.0 },
+    { "piece": "grass_tuft", "at": [0, 9.5], "scale": 1.2 },
+    { "piece": "grass_tuft", "at": [0, -9.2], "scale": 1.0 },
+    { "piece": "rock_scatter", "at": [-12.8, 10.5], "scale": 1.2 },
+    { "piece": "rock_scatter", "at": [12.5, 11.8], "scale": 0.85 },
+    { "piece": "rock_scatter", "at": [-17.5, 1.5], "scale": 1.05 },
+    { "piece": "rock_scatter", "at": [17.8, 5.5], "scale": 0.95 }
   ]
 }

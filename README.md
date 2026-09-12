@@ -5,13 +5,14 @@ data-driven core, a procedural 3D world (Filament via SceneView) and a mobile-on
 development pipeline where GitHub is the single source of truth and GitHub Actions
 is the build farm.
 
-**Current milestone: Vertical Slice v0.1.0** — the first playable proof of the core loop.
+**Current milestone: Phase 2 v0.2.0** — cinematic presentation on top of the playable vertical slice.
 
 ## Play it
 
-1. Download `MiningTycoon3D.apk` from the [latest release](https://github.com/davidruizreyez3005/idle-mining-tycoon-3d/releases).
+1. Download `MiningTycoon3D-v0.2.0.apk` from the [latest release](https://github.com/davidruizreyez3005/idle-mining-tycoon-3d/releases).
 2. Install on any Android 7.0+ device (minSdk 24) — the release APK is debug-signed for sideloading.
-3. Tap a rock to mine it, tap the ground to walk, drag to orbit the camera, pinch to zoom.
+3. Tap a rock to mine it, tap the ground to walk — the fixed cinematic camera frames the action
+   and follows you automatically.
 4. Sell at the depot (the spinning gold coin), buy upgrades, buy the Auto-Extractor,
    close the app and come back to a "While you were away..." report.
 
@@ -26,8 +27,22 @@ is the build farm.
 - 5 data-driven upgrades (pickaxe, boots, backpack, market contracts, auto-extractor).
 - Idle production + offline earnings capped at 4 h, with a welcome-back dialog.
 - Versioned, migration-aware save system with atomic file writes.
-- 37 JVM unit tests covering content validation, economy math, save migrations and
+- JVM unit tests covering content validation, economy math, save migrations and
   the full simulation loop.
+
+## Phase 2 — cinematic presentation
+
+- **Fixed cinematic camera**: authored yaw/pitch/distance/fov in `world.json`, zero
+  gesture orbit; the framing target softly follows the worker inside a clamped
+  window (deadzone + strength + range, all data-driven).
+- **Depth**: warm sun + cool sky fill (2048 px soft shadow map), atmospheric distance
+  fog with sun in-scattering, a tree ring and mountain silhouettes on a wide apron —
+  layered haze instead of a flat backdrop.
+- **Shading**: per-material PBR (brushed steel, near-mirror gold, matte rock,
+  polished-gem ore crystals, unlit glowing lamps), ACES tone mapping, bloom, vignette
+  and SSAO on the Cinematic quality preset.
+- Every look parameter lives in the `visuals` block of `world.json` — per-zone moods
+  without touching code.
 
 ## Build locally
 

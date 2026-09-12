@@ -105,4 +105,103 @@ class ContentLoaderTest {
         }
     }
 
+    // ------------------------------------------------------------- phase 2: camera + visuals
+
+    @Test
+    fun `camera and visuals parse from world data`() {
+        val content = TestContent.build()
+        val camera = content.world.camera
+        assertEquals(31f, camera.yaw, 0.001f)
+        assertEquals(33f, camera.pitch, 0.001f)
+        assertEquals(21.5f, camera.distance, 0.001f)
+        assertEquals(42f, camera.fov, 0.001f)
+        assertEquals(3, camera.target.size)
+        assertEquals(0.18f, camera.followStrength, 0.001f)
+        assertEquals(3.2f, camera.followDeadzone, 0.001f)
+
+        val visuals = content.world.visuals
+        assertEquals("aces", visuals.toneMapping)
+        assertEquals(26_000f, visuals.sun.intensity, 0.01f)
+        assertEquals(3, visuals.sun.direction.size)
+        assertEquals(2048, visuals.sun.shadowMapSize)
+        assertTrue(visuals.fog.enabled)
+        assertEquals(0.012f, visuals.fog.density, 0.0001f)
+        assertEquals(0.2f, visuals.bloom.strength, 0.001f)
+    }
+
+    @Test
+    fun `camera defaults apply when block is absent`() {
+        // bundleOverrides' world file has no camera/visuals blocks at all.
+        val content = ContentLoader.load(TestContent.bundleOverrides())
+        val camera = content.world.camera
+        assertEquals(30f, camera.yaw, 0.001f)
+        assertEquals(0.16f, camera.followStrength, 0.001f)
+        assertEquals("aces", content.world.visuals.toneMapping)
+        assertTrue(content.world.visuals.fog.enabled)
+    }
+
+    @Test
+    fun `bad sun direction is rejected`() {
+        try {
+            ContentLoader.load(TestContent.bundleOverrides(
+                ContentLoader.FILE_WORLD to """
+                    { "version": 1, "zone": "z", "name": "Z",
+                      "nodes": [ { "typeId": "stone_vein", "at": [1, 6] } ],
+                      "visuals": { "sun": { "direction": [0, 0, 0] } } }
+                """.trimIndent(),
+            ))
+            fail("expected zero direction failure")
+        } catch (e: ContentException) {
+            assertTrue(e.message!!.contains("visuals.sun.direction"))
+        }
+    }
+
+    @Test
+    fun `unknown tone mapping is rejected`() {
+        try {
+            ContentLoader.load(TestContent.bundleOverrides(
+                ContentLoader.FILE_WORLD to """
+                    { "version": 1, "zone": "z", "name": "Z",
+                      "nodes": [ { "typeId": "stone_vein", "at": [1, 6] } ],
+                      "visuals": { "toneMapping": "technicolor" } }
+                """.trimIndent(),
+            ))
+            fail("expected toneMapping failure")
+        } catch (e: ContentException) {
+            assertTrue(e.message!!.contains("toneMapping"))
+        }
+    }
+
+    @Test
+    fun `invalid camera fov is rejected`() {
+        try {
+            ContentLoader.load(TestContent.bundleOverrides(
+                ContentLoader.FILE_WORLD to """
+                    { "version": 1, "zone": "z", "name": "Z",
+                      "nodes": [ { "typeId": "stone_vein", "at": [1, 6] } ],
+                      "camera": { "fov": 0 } }
+                """.trimIndent(),
+            ))
+            fail("expected fov failure")
+        } catch (e: ContentException) {
+            assertTrue(e.message!!.contains("camera.fov"))
+        }
+    }
+
+    @Test
+    fun `non power of two shadow map is rejected`() {
+        try {
+            ContentLoader.load(TestContent.bundleOverrides(
+                ContentLoader.FILE_WORLD to """
+                    { "version": 1, "zone": "z", "name": "Z",
+                      "nodes": [ { "typeId": "stone_vein", "at": [1, 6] } ],
+                      "visuals": { "sun": { "shadowMapSize": 1000 } } }
+                """.trimIndent(),
+            ))
+            fail("expected shadowMapSize failure")
+        } catch (e: ContentException) {
+            assertTrue(e.message!!.contains("shadowMapSize"))
+        }
+    }
+
 }
