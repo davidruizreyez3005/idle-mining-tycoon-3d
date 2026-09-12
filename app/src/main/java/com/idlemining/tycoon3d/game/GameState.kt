@@ -25,6 +25,12 @@ data class GameState(
     val nodes: List<NodeState>,
     val stats: StatsState,
     val flags: Map<String, Boolean>,
+    /**
+     * The market clock (seconds). Advanced by the simulation tick; seeded
+     * deterministically at load so live prices resume on a fresh, effectively
+     * arbitrary phase instead of resetting to the same curve every launch.
+     */
+    val marketTimeSec: Double = 0.0,
     /** Set at load when the away-time report has not been seen yet. */
     val offlineReport: OfflineReport? = null,
 ) {

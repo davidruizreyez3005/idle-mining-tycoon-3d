@@ -38,6 +38,9 @@ object Simulation {
         nodes = content.world.nodes.resolveNodes(content),
         stats = StatsState(),
         flags = emptyMap(),
+        // New games start the market clock at an epoch-derived phase so the
+        // first session already shows varied (not-all-neutral) prices.
+        marketTimeSec = nowMs / 1000.0,
     )
 
     /**
@@ -79,6 +82,8 @@ object Simulation {
                 nodesBroken = save.stats.nodesBroken,
             ),
             flags = save.flags,
+            // Resume the market on a phase derived from the save stamp.
+            marketTimeSec = save.savedAtMs / 1000.0,
             offlineReport = offline,
         )
     }
@@ -105,18 +110,20 @@ object Simulation {
 
     /**
      * Computes the away-time report. Pure — takes explicit timestamps so tests
-     * can dial any elapsed time.
+     * can dial any elapsed time. Values use the market phase the save resumes
+     * on, so the number matches what selling right after collecting yields.
      */
     fun computeOffline(content: GameContent, save: SaveData, nowMs: Long): OfflineReport? {
         // Away-time earnings accrue whenever the game was closed with an extractor
         // running — the report is shown once at load, then cleared from state.
         val elapsed = ((nowMs - save.savedAtMs) / 1000L).coerceAtLeast(0L)
         val earnings = EconomyRules.offlineEarnings(
-            content, save.upgrades["extractor"] ?: 0, elapsed,
+            content, save.upgrades, elapsed,
         )
         if (earnings.resources.isEmpty()) return null
+        val marketTimeSec = save.savedAtMs / 1000.0
         val value = earnings.resources.entries.sumOf { (id, count) ->
-            EconomyRules.sellPricePerUnit(content, content.resource(id), save.upgrades) * count
+            EconomyRules.sellPricePerUnit(content, content.resource(id), save.upgrades, marketTimeSec) * count
         }
         return OfflineReport(
             awaySeconds = earnings.effectiveSeconds,
@@ -127,7 +134,12 @@ object Simulation {
 
     // ----------------------------------------------------------------- tick
 
-    fun simulate(state: GameState, dtSec: Float, events: MutableList<GameEvent>): GameState {
+    fun simulate(
+        state: GameState,
+        dtSec: Float,
+        events: MutableList<GameEvent>,
+        random: kotlin.random.Random = kotlin.random.Random.Default,
+    ): GameState {
         if (dtSec <= 0f) return state
 
         var worker = state.worker
@@ -199,7 +211,8 @@ object Simulation {
                         val hpLeft = (node.hp - dps * dtSec).coerceAtLeast(0f)
                         nodes = nodes.toMutableList().also { it[node.index] = node.copy(hp = hpLeft) }
                         if (hpLeft <= 0f) {
-                            val result = breakNode(state, nodes, node.index, inventory, events)
+                            val luckyRoll = random.nextDouble()
+                            val result = breakNode(state, nodes, node.index, inventory, luckyRoll, events)
                             nodes = result.nodes
                             inventory = result.inventory
                             stats = stats.copy(
@@ -246,8 +259,9 @@ object Simulation {
             }
         }
 
-        // 4. Time played.
+        // 4. Time played + the market clock.
         stats = stats.copy(playSeconds = stats.playSeconds + dtSec)
+        val marketTimeSec = state.marketTimeSec + dtSec
 
         return state.copy(
             money = money,
@@ -256,6 +270,7 @@ object Simulation {
             worker = worker,
             nodes = nodes,
             stats = stats,
+            marketTimeSec = marketTimeSec,
         )
     }
 
@@ -414,7 +429,9 @@ object Simulation {
         return Math.toDegrees(atan2(dx, dz).toDouble()).toFloat()
     }
 
-    /** Breaks a node: credits capacity-clamped drops, sets respawn, emits events. */
+    /** Breaks a node: capacity-clamped drops (doubled on a lucky strike), sets
+     * respawn, emits events. [luckyRoll] is a uniform sample in [0, 1) drawn by
+     * the caller — keeps this function pure and unit-testable. */
     private data class BreakResult(
         val nodes: List<NodeState>,
         val inventory: Map<String, Int>,
@@ -426,6 +443,7 @@ object Simulation {
         nodes: List<NodeState>,
         index: Int,
         inventory: Map<String, Int>,
+        luckyRoll: Double,
         events: MutableList<GameEvent>,
     ): BreakResult {
         val node = nodes[index]
@@ -433,12 +451,16 @@ object Simulation {
         val capacity = EconomyRules.backpackCapacity(state.content, state.upgrades)
         val carried = inventory.values.sum()
 
+        // Lucky Strikes — Phase 3 ability: a chance for the vein to drop double.
+        val lucky = luckyRoll < EconomyRules.luckyStrikeChance(state.content, state.upgrades)
+        val yields = if (lucky) def.yields.mapValues { it.value * 2 } else def.yields
+        val totalYield = yields.values.sum()
+
         var free = (capacity - carried).coerceAtLeast(0)
         val collected = mutableMapOf<String, Int>()
         val nextInventory = inventory.toMutableMap()
-        val totalYield = def.yields.values.sum()
         var totalCollected = 0
-        for ((res, count) in def.yields) {
+        for ((res, count) in yields) {
             val take = capacityClamp(0, count, free)
             if (take > 0) {
                 collected[res] = (collected[res] ?: 0) + take
@@ -450,6 +472,9 @@ object Simulation {
         if (totalCollected < totalYield) {
             events.add(GameEvent.BackpackFull)
             events.add(GameEvent.Popup("Backpack full — sell at the depot!", PopupKind.WARN))
+        }
+        if (lucky && totalCollected > 0) {
+            events.add(GameEvent.Popup("Lucky strike! Double loot", PopupKind.INFO))
         }
 
         val respawned = node.copy(hp = 0f, respawnRemainingSec = def.respawnSeconds.toFloat())
@@ -465,7 +490,9 @@ object Simulation {
      */
     fun sellAll(state: GameState, events: MutableList<GameEvent>): GameState {
         if (state.inventory.isEmpty()) return state
-        val value = EconomyRules.inventoryValue(state.content, state.inventory, state.upgrades)
+        val value = EconomyRules.inventoryValue(
+            state.content, state.inventory, state.upgrades, state.marketTimeSec,
+        )
         val units = state.totalCarried
         events.add(GameEvent.Sold(value, units))
         return state.copy(

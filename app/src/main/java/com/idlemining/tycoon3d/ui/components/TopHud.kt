@@ -61,7 +61,9 @@ fun TopHud(state: GameState, modifier: Modifier = Modifier) {
             if (extractorLevel > 0) {
                 val perSecond = EconomyRules.idleRatesPerSecond(state.content, extractorLevel)
                     .entries.sumOf { (id, rate) ->
-                        EconomyRules.sellPricePerUnit(state.content, state.content.resource(id), state.upgrades) * rate
+                        EconomyRules.sellPricePerUnit(
+                            state.content, state.content.resource(id), state.upgrades, state.marketTimeSec,
+                        ) * rate
                     }
                 if (perSecond > 0.0) {
                     Chip {

@@ -27,6 +27,7 @@ import com.idlemining.tycoon3d.game.PopupKind
 import com.idlemining.tycoon3d.game.scene.GameScene
 import com.idlemining.tycoon3d.ui.components.BottomBar
 import com.idlemining.tycoon3d.ui.components.HintOverlay
+import com.idlemining.tycoon3d.ui.components.MarketPanel
 import com.idlemining.tycoon3d.ui.components.MiningProgress
 import com.idlemining.tycoon3d.ui.components.OfflineDialog
 import com.idlemining.tycoon3d.ui.components.PopupEntry
@@ -50,6 +51,7 @@ fun GameScreen(viewModel: GameViewModel) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val gameStateForScene = rememberUpdatedState(state)
     var showUpgrades by remember { mutableStateOf(false) }
+    var showMarket by remember { mutableStateOf(false) }
 
     val popups = remember { mutableStateListOf<PopupEntry>() }
     val dispatchLatest = rememberUpdatedState(viewModel::dispatch)
@@ -112,6 +114,7 @@ fun GameScreen(viewModel: GameViewModel) {
         BottomBar(
             state = state,
             onSell = { dispatchLatest.value(GameIntent.TapDepot) },
+            onMarket = { showMarket = true },
             onUpgrades = { showUpgrades = true },
             modifier = Modifier.align(Alignment.BottomCenter),
         )
@@ -142,6 +145,16 @@ fun GameScreen(viewModel: GameViewModel) {
                     state = state,
                     onBuy = { id -> dispatchLatest.value(GameIntent.BuyUpgrade(id)) },
                 )
+            }
+        }
+
+        if (showMarket) {
+            ModalBottomSheet(
+                onDismissRequest = { showMarket = false },
+                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+                containerColor = MaterialTheme.colorScheme.background,
+            ) {
+                MarketPanel(state = state)
             }
         }
     }

@@ -4,8 +4,11 @@
     {
       "id": "pickaxe",
       "name": "Reinforced Pickaxe",
-      "desc": "Swing harder — mining speed +35% per level.",
-      "effect": { "type": "miningSpeed", "perLevel": 0.35 },
+      "desc": "Swing harder \u2014 mining speed +35% per level.",
+      "effect": {
+        "type": "miningSpeed",
+        "perLevel": 0.35
+      },
       "baseCost": 60,
       "costGrowth": 1.9,
       "maxLevel": 10,
@@ -14,8 +17,11 @@
     {
       "id": "boots",
       "name": "Speed Boots",
-      "desc": "Grippy soles — movement speed +18% per level.",
-      "effect": { "type": "moveSpeed", "perLevel": 0.18 },
+      "desc": "Grippy soles \u2014 movement speed +18% per level.",
+      "effect": {
+        "type": "moveSpeed",
+        "perLevel": 0.18
+      },
       "baseCost": 45,
       "costGrowth": 1.75,
       "maxLevel": 8,
@@ -25,31 +31,81 @@
       "id": "backpack",
       "name": "Big Backpack",
       "desc": "Carry 6 more resources per level before selling.",
-      "effect": { "type": "backpack", "perLevel": 6.0 },
+      "effect": {
+        "type": "backpack",
+        "perLevel": 6.0
+      },
       "baseCost": 50,
       "costGrowth": 1.7,
       "maxLevel": 10,
       "category": "logistics"
     },
     {
+      "id": "lucky",
+      "name": "Lucky Strikes",
+      "desc": "Keen eye \u2014 +6% chance per level of double loot when a vein breaks.",
+      "effect": {
+        "type": "luckyStrike",
+        "perLevel": 0.06
+      },
+      "baseCost": 260,
+      "costGrowth": 2.0,
+      "maxLevel": 8,
+      "category": "tools"
+    },
+    {
       "id": "market",
       "name": "Trade Contracts",
-      "desc": "Better prices — all resources sell for +15% per level.",
-      "effect": { "type": "sellMargin", "perLevel": 0.15 },
+      "desc": "Better prices \u2014 all resources sell for +15% per level.",
+      "effect": {
+        "type": "sellMargin",
+        "perLevel": 0.15
+      },
       "baseCost": 120,
       "costGrowth": 2.0,
       "maxLevel": 10,
       "category": "economy"
     },
     {
+      "id": "warehouse",
+      "name": "Warehouse",
+      "desc": "Deep storage \u2014 offline earnings last 2h longer per level.",
+      "effect": {
+        "type": "offlineCap",
+        "perLevel": 2.0
+      },
+      "baseCost": 220,
+      "costGrowth": 2.15,
+      "maxLevel": 6,
+      "category": "economy"
+    },
+    {
       "id": "extractor",
       "name": "Auto-Extractor",
-      "desc": "A little machine keeps digging while you are away. Stone per second scales with level; coal unlocks at level 4.",
+      "desc": "A little machine keeps digging while you are away. Stone and coal scale with level; silver unlocks at 7, crystal at 10.",
       "effect": {
         "type": "idleExtraction",
         "rates": [
-          { "resource": "stone", "perLevel": 0.4, "unlockLevel": 1 },
-          { "resource": "coal", "perLevel": 0.15, "unlockLevel": 4 }
+          {
+            "resource": "stone",
+            "perLevel": 0.4,
+            "unlockLevel": 1
+          },
+          {
+            "resource": "coal",
+            "perLevel": 0.15,
+            "unlockLevel": 4
+          },
+          {
+            "resource": "silver",
+            "perLevel": 0.06,
+            "unlockLevel": 7
+          },
+          {
+            "resource": "crystal",
+            "perLevel": 0.02,
+            "unlockLevel": 10
+          }
         ]
       },
       "baseCost": 150,

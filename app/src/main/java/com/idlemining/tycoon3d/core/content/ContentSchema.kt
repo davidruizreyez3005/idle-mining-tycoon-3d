@@ -72,10 +72,11 @@ data class UpgradeDef(
 
 @Serializable
 data class EffectDef(
-    /**
-     * One of: miningSpeed | moveSpeed | backpack | sellMargin | idleExtraction.
-     * `perLevel` applies for the scalar effects; `rates` only for idleExtraction.
-     */
+/**
+ * One of: miningSpeed | moveSpeed | backpack | sellMargin | idleExtraction |
+ * offlineCap | luckyStrike. `perLevel` applies for the scalar effects;
+ * `rates` only for idleExtraction.
+ */
     val type: String,
     /** Double — this feeds money math where Float precision visibly drifts. */
     val perLevel: Double = 0.0,
@@ -101,6 +102,7 @@ data class EconomyFile(
     val worker: WorkerTuning = WorkerTuning(),
     val sell: SellTuning = SellTuning(),
     val idle: IdleTuning = IdleTuning(),
+    val market: MarketTuning = MarketTuning(),
 )
 
 @Serializable
@@ -119,6 +121,24 @@ data class SellTuning(val depotRadius: Float = 3.0f)
 
 @Serializable
 data class IdleTuning(val offlineCapHours: Int = 4)
+
+/**
+ * Dynamic market — Phase 3. Resource prices drift on slow sine waves so the
+ * right time to sell becomes a real decision.
+ *
+ * - [amplitude]: fractional swing around the base price (0.22 = ±22%).
+ * - [basePeriodSec] / [periodSpreadSec]: each resource gets a period in
+ *   [basePeriodSec, basePeriodSec + periodSpreadSec], derived deterministically
+ *   from its index, so waves stay out of sync.
+ * - [trendWindowSec]: how far back the UI compares prices to draw ▲/▼ arrows.
+ */
+@Serializable
+data class MarketTuning(
+    val amplitude: Float = 0.22f,
+    val basePeriodSec: Float = 300f,
+    val periodSpreadSec: Float = 180f,
+    val trendWindowSec: Float = 30f,
+)
 
 // ---------------------------------------------------------------------------
 // world.json — the modular zone layout
@@ -150,29 +170,35 @@ data class GroundDef(
 )
 
 /**
- * Fixed cinematic camera — Phase 2 presentation. The angle never changes during
- * play (no orbit/pan/zoom gestures); the framing target softly tracks the worker
- * inside a clamped follow window so the composition stays lively.
+ * Locked 45° orthographic camera — Phase 3 presentation. The angle and the
+ * projection NEVER change during play (no orbit gesture); the player pans by
+ * dragging and zooms by pinching, both clamped so the mine stays reachable.
  *
  * - [yaw] / [pitch]: fixed viewing angles in degrees. yaw 0 looks toward -Z
  *   (camera on the +Z side); positive yaw swings the camera toward +X.
- * - [distance]: constant eye-to-target distance in meters.
- * - [fov]: vertical field of view in degrees (converted to a focal length).
- * - [target]: initial framing anchor [x, y, z].
- * - follow*: soft tracking of the worker (deadzone + proportional strength,
- *  clamped to ±followRange around the anchor).
+ * - [distance]: constant eye-to-target distance in meters. With an ortho
+ *   projection this does not affect framing — it only places the eye inside
+ *   the [near]/[far] depth range.
+ * - [target]: framing anchor [x, y, z] — the ground point at screen center
+ *   when no pan has been applied.
+ * - [zoomHeight]: default visible vertical extent in meters; pinch zoom is
+ *   clamped to [zoomMinHeight] / [zoomMaxHeight].
+ * - [panRangeX] / [panRangeZ]: how far (meters) the target may move from the
+ *   anchor while panning.
  */
 @Serializable
 data class CameraDef(
-    val yaw: Float = 30f,
-    val pitch: Float = 33f,
-    val distance: Float = 21f,
-    val fov: Float = 42f,
+    val yaw: Float = 31f,
+    val pitch: Float = 45f,
+    val distance: Float = 60f,
     val target: List<Float> = listOf(0f, 0.6f, -5f),
-    val followStrength: Float = 0.16f,
-    val followDeadzone: Float = 3.0f,
-    val followRangeX: Float = 8.0f,
-    val followRangeZ: Float = 6.0f,
+    val zoomHeight: Float = 26f,
+    val zoomMinHeight: Float = 13f,
+    val zoomMaxHeight: Float = 52f,
+    val panRangeX: Float = 15f,
+    val panRangeZ: Float = 14f,
+    val near: Float = 1f,
+    val far: Float = 400f,
 )
 
 // ---------------------------------------------------------------------------

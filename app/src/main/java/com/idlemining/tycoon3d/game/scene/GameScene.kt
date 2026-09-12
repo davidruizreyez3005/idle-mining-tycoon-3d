@@ -20,35 +20,36 @@ import com.idlemining.tycoon3d.game.world.WorldBuilder
 import io.github.sceneview.RenderQuality
 import io.github.sceneview.SceneView
 import io.github.sceneview.collision.HitResult
-import io.github.sceneview.node.CameraNode
 import io.github.sceneview.node.Node
-import io.github.sceneview.rememberCameraNode
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberEnvironment
 import io.github.sceneview.rememberMaterialLoader
 import io.github.sceneview.rememberView
-import kotlin.math.tan
 
 /**
  * The 3D viewport: builds the world once from content data, then drives all
  * animation and the camera in `onFrame` (the Compose tree never recomposes
  * during play).
  *
- * Camera — FIXED (Phase 2): the angle, distance and fov are authored in
- * `world.json` and never change; there are no orbit/pan/zoom gestures. The
- * framing target softly tracks the worker inside a clamped window
- * ([FixedCameraController]). Passing `cameraManipulator = null` keeps
- * SceneView's gesture layer from ever touching the camera node.
+ * Camera — LOCKED 45° ORTHO (Phase 3): the angle and the orthographic
+ * projection are authored in `world.json` and never change. The player pans
+ * by dragging (one finger) and zooms by pinching, both clamped so the mine
+ * and depot stay reachable ([OrthoCameraController] on an [OrthoCameraNode]).
+ * Passing `cameraManipulator = null` keeps SceneView's gesture layer from
+ * ever touching the camera node.
  *
  * Presentation — (Phase 2): warm sun + cool sky fill (both data-driven, the
  * sun casting soft 2048px shadows), neutral IBL under a sky-colored skybox,
- * distance fog with sun in-scattering, SSAO, bloom, vignette and an ACES color
- * grade ([ScenePresentation]).
+ * distance fog with sun in-scattering, SSAO, bloom and an ACES color grade
+ * ([ScenePresentation]). The vignette is disabled in data (Phase 3: clean,
+ * unframed edges).
  *
  * Input model (touch-first):
  * - Tap on a node    → walk there and mine it
  * - Tap on the depot → walk there and sell
  * - Tap on ground    → walk there
+ * - Drag (1 finger)  → pan the camera
+ * - Pinch (2 fingers)→ zoom the camera
  */
 @Composable
 fun GameScene(
@@ -68,7 +69,7 @@ fun GameScene(
     val refs = remember(content) { SceneRefs(nodeCount) }
     val registry = remember(content) { NodeRegistry() }
     val animator = remember(refs, mats) { SceneAnimator(refs, mats, nodeCount) }
-    val cameraController = remember(cameraConfig) { FixedCameraController(cameraConfig) }
+    val cameraController = remember(cameraConfig) { OrthoCameraController(cameraConfig) }
     val dispatchLatest = rememberUpdatedState(dispatch)
     val density = LocalDensity.current
     val touchSlopPx = with(density) { 24.dp.toPx() }
@@ -77,12 +78,9 @@ fun GameScene(
     val touch = remember { TouchTracker() }
     val frameClock = remember { longArrayOf(0L) }
 
-    // ── Fixed camera: fov authored in data, converted to the 35mm-equivalent
-    //    focal length SceneView's updateProjection() keeps using on resizes.
-    val cameraNode: CameraNode = rememberCameraNode(engine) {
-        isSmoothTransformEnabled = false
-        focalLength = 12.0 / tan(Math.toRadians(cameraConfig.fov.toDouble()) / 2.0)
-    }
+    // ── Locked ortho camera: the node overrides updateProjection so even
+    //    SceneView's own resize callback keeps the orthographic frustum.
+    val cameraNode: OrthoCameraNode = rememberSceneNode { OrthoCameraNode(engine) }
 
     // ── Presentation: sun, fill, environment (lights built once per content).
     //    Local non-inline remember: SceneView's `rememberNode` is an inline
@@ -108,12 +106,16 @@ fun GameScene(
         fillLightNode = fill,
         environment = environment,
         cameraNode = cameraNode,
-        // FIXED CAMERA — no gesture control; we own the transform every frame.
+        // LOCKED ORTHO CAMERA — no gesture manipulator; pan/zoom are handled
+        // in our own touch handler and applied through the controller.
         cameraManipulator = null,
         onTouchEvent = { event, hitResult ->
-            handleTouch(event, hitResult, touch, touchSlopPx, registry, dispatchLatest.value)
-            // Never consume — node touches must keep working (no camera gestures
-            // left to protect).
+            handleTouch(
+                event, hitResult, touch, touchSlopPx,
+                cameraNode, cameraController, registry, dispatchLatest.value,
+            )
+            // Never consume — node touches must keep working (the camera is
+            // driven by our own controller, not by SceneView gestures).
             false
         },
         onFrame = { frameTimeNanos ->
@@ -122,9 +124,8 @@ fun GameScene(
                 .coerceIn(0.0, 0.1).toFloat()
             frameClock[0] = frameTimeNanos
 
-            val state = gameState.value
-            cameraController.update(cameraNode, state.worker.x, state.worker.z, dt)
-            animator.advance(state, frameTimeNanos)
+            cameraController.update(cameraNode)
+            animator.advance(gameState.value, frameTimeNanos)
         },
     ) {
         WorldBuilder(content, refs, registry, mats)
@@ -153,12 +154,28 @@ private fun <T : Node> rememberSceneNode(create: () -> T): T {
     return node
 }
 
-/** Tracks a potential tap between ACTION_DOWN and ACTION_UP. */
+/** Tracks the gesture state machine across touch events. */
 private class TouchTracker {
+    // Tap candidate.
     var downX = 0f
     var downY = 0f
     var downTimeMs = 0L
     var tracking = false
+
+    // Pan (single finger).
+    var panning = false
+    var lastX = 0f
+    var lastY = 0f
+
+    // Pinch (two fingers).
+    var pinching = false
+    var pinchLastDist = 0f
+
+    fun reset() {
+        tracking = false
+        panning = false
+        pinching = false
+    }
 }
 
 private fun handleTouch(
@@ -166,6 +183,8 @@ private fun handleTouch(
     hitResult: HitResult?,
     touch: TouchTracker,
     slopPx: Float,
+    cameraNode: OrthoCameraNode,
+    camera: OrthoCameraController,
     registry: NodeRegistry,
     dispatch: (GameIntent) -> Unit,
 ) {
@@ -175,11 +194,58 @@ private fun handleTouch(
             touch.downY = event.y
             touch.downTimeMs = System.currentTimeMillis()
             touch.tracking = true
+            touch.panning = false
+            touch.pinching = false
+            touch.lastX = event.x
+            touch.lastY = event.y
+        }
+
+        MotionEvent.ACTION_POINTER_DOWN -> {
+            if (event.pointerCount == 2) {
+                // A second finger ends any tap/pan candidate and starts a pinch.
+                touch.reset()
+                touch.pinching = true
+                touch.pinchLastDist = pinchDistance(event)
+            }
+        }
+
+        MotionEvent.ACTION_MOVE -> {
+            if (touch.pinching && event.pointerCount >= 2) {
+                val dist = pinchDistance(event)
+                if (dist > 1f && touch.pinchLastDist > 1f) {
+                    val midX = (event.getX(0) + event.getX(1)) / 2f
+                    val midY = (event.getY(0) + event.getY(1)) / 2f
+                    camera.zoom(cameraNode, dist / touch.pinchLastDist, midX, midY)
+                }
+                touch.pinchLastDist = dist
+            } else if (!touch.pinching) {
+                val dx = event.x - touch.lastX
+                val dy = event.y - touch.lastY
+                touch.lastX = event.x
+                touch.lastY = event.y
+                if (touch.tracking) {
+                    val totalDx = event.x - touch.downX
+                    val totalDy = event.y - touch.downY
+                    if (totalDx * totalDx + totalDy * totalDy > slopPx * slopPx) {
+                        // The finger drifted — this is a pan, not a tap.
+                        touch.tracking = false
+                        touch.panning = true
+                    }
+                }
+                if (touch.panning) camera.pan(cameraNode, dx, dy)
+            }
+        }
+
+        MotionEvent.ACTION_POINTER_UP -> {
+            // A finger lifted from a pinch: end the gesture entirely (a fresh
+            // DOWN starts a new pan or tap).
+            touch.reset()
         }
 
         MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-            if (!touch.tracking) return
-            touch.tracking = false
+            val wasTracking = touch.tracking
+            touch.reset()
+            if (!wasTracking) return
             if (event.actionMasked == MotionEvent.ACTION_CANCEL) return
             val dx = event.x - touch.downX
             val dy = event.y - touch.downY
@@ -200,4 +266,10 @@ private fun handleTouch(
             }
         }
     }
+}
+
+private fun pinchDistance(event: MotionEvent): Float {
+    val dx = event.getX(0) - event.getX(1)
+    val dy = event.getY(0) - event.getY(1)
+    return kotlin.math.hypot(dx, dy)
 }

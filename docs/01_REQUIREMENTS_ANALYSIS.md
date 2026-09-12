@@ -49,9 +49,9 @@ The brief's section 31 demands a **playable vertical slice** before anything els
 | Phase | Theme | Status |
 |-------|-------|--------|
 | 1 | Core loop vertical slice | **done (this repo)** |
-| 2 | Economy depth (market fluctuation, contracts) | next |
-| 3 | Upgrade trees + special abilities | planned |
-| 4 | Machines (crusher, smelter, conveyor networks) | planned |
+| 2 | Economy depth (market fluctuation, contracts) | **done (v0.3.0)** |
+| 3 | Upgrade trees + special abilities | **done (v0.3.0, first pass)** |
+| 4 | Machines (crusher, smelter, conveyor networks) | next |
 | 5 | Worker automation (hire, task, pathing) | planned |
 | 6 | Underground expansion (7+ visually distinct levels) | planned |
 | 7 | 3D quality (lighting, toon shading, post-FX) | planned |

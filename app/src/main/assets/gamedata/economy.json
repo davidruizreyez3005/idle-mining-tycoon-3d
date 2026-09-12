@@ -15,5 +15,11 @@
   },
   "idle": {
     "offlineCapHours": 4
+  },
+  "market": {
+    "amplitude": 0.22,
+    "basePeriodSec": 300,
+    "periodSpreadSec": 180,
+    "trendWindowSec": 30
   }
 }

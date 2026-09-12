@@ -1,5 +1,6 @@
 package com.idlemining.tycoon3d
 
+import com.idlemining.tycoon3d.core.economy.EconomyRules
 import com.idlemining.tycoon3d.game.GameEvent
 import com.idlemining.tycoon3d.game.GameIntent
 import com.idlemining.tycoon3d.game.GameState
@@ -19,12 +20,17 @@ class SimulationTest {
 
     private fun newState(): GameState = Simulation.initial(content, nowMs)
 
-    private fun tick(state: GameState, seconds: Float, events: MutableList<GameEvent> = mutableListOf()): GameState {
+    private fun tick(
+        state: GameState,
+        seconds: Float,
+        events: MutableList<GameEvent> = mutableListOf(),
+        random: kotlin.random.Random = kotlin.random.Random.Default,
+    ): GameState {
         var s = state
         var left = seconds
         while (left > 0f) {
             val dt = minOf(0.1f, left)
-            s = Simulation.simulate(s, dt, events)
+            s = Simulation.simulate(s, dt, events, random)
             left -= dt
         }
         return s
@@ -106,12 +112,63 @@ class SimulationTest {
         val events = mutableListOf<GameEvent>()
         state = Simulation.reduce(state, GameIntent.TapDepot, events)
 
+        // Live prices at the state's market clock (seeded from nowMs).
+        val time = state.marketTimeSec
+        val expected = 3 * EconomyRules.sellPricePerUnit(content, content.resource("stone"), emptyMap(), time) +
+                1 * EconomyRules.sellPricePerUnit(content, content.resource("gold"), emptyMap(), time)
+
         val sold = events.filterIsInstance<GameEvent.Sold>().firstOrNull()
         assertNotNull(sold)
-        assertEquals(51.0, sold!!.amount, 1e-9) // 3*2 + 45
-        assertEquals(25.0 + 51.0, state.money, 1e-9)
+        assertEquals(expected, sold!!.amount, 1e-9)
+        assertEquals(25.0 + expected, state.money, 1e-9)
         assertTrue(state.inventory.isEmpty())
-        assertEquals(51.0, state.stats.totalEarned, 1e-9)
+        assertEquals(expected, state.stats.totalEarned, 1e-9)
+    }
+
+    @Test
+    fun `market clock advances with the simulation tick`() {
+        var state = newState()
+        assertEquals(1000.0, state.marketTimeSec, 1e-9) // seeded from nowMs
+        state = tick(state, 2.5f)
+        assertEquals(1002.5, state.marketTimeSec, 0.05)
+    }
+
+    @Test
+    fun `market time resumes from the save stamp`() {
+        val state = newState()
+        val save = Simulation.toSave(state, nowMs + 5000L)
+        val loaded = Simulation.fromSave(content, save, nowMs + 6000L, null)
+        assertEquals(1005.0, loaded.marketTimeSec, 1e-9)
+    }
+
+    @Test
+    fun `lucky strike doubles node loot`() {
+        // Level 8 = 48% chance — and the rigged random always rolls 0 (< 0.48).
+        val alwaysLucky = object : kotlin.random.Random() {
+            override fun nextBits(bitCount: Int): Int = 0
+            override fun nextDouble(): Double = 0.0
+        }
+        var state = newState().copy(upgrades = mapOf("lucky" to 8))
+        val events = mutableListOf<GameEvent>()
+        state = Simulation.reduce(state, GameIntent.TapNode(TestContent.STONE_NODE), events)
+        state = tick(state, 6.0f, events, random = alwaysLucky)
+
+        assertEquals(6, state.inventory["stone"]) // double of 3
+        assertEquals(6, state.stats.totalMined)
+        assertTrue(events.any { it is GameEvent.Popup && it.text.contains("Lucky") })
+    }
+
+    @Test
+    fun `without lucky levels loot stays single`() {
+        // Even a rigged always-winning roll does nothing at level 0.
+        val alwaysLucky = object : kotlin.random.Random() {
+            override fun nextBits(bitCount: Int): Int = 0
+            override fun nextDouble(): Double = 0.0
+        }
+        var state = newState()
+        state = Simulation.reduce(state, GameIntent.TapNode(TestContent.STONE_NODE), mutableListOf())
+        state = tick(state, 6.0f, random = alwaysLucky)
+        assertEquals(3, state.inventory["stone"])
     }
 
     @Test
@@ -168,7 +225,11 @@ class SimulationTest {
         val report = Simulation.computeOffline(content, save, awayMs)
         assertNotNull(report)
         assertEquals(2880, report!!.resources["stone"])
-        assertEquals(5760.0, report.totalValue, 1e-9) // 2880 * $2
+        // Value priced at the market phase the save resumes on.
+        val pricePerUnit = EconomyRules.sellPricePerUnit(
+            content, content.resource("stone"), save.upgrades, save.savedAtMs / 1000.0,
+        )
+        assertEquals(2880 * pricePerUnit, report.totalValue, 1e-9)
 
         val loaded = Simulation.fromSave(content, save, awayMs, report)
         assertEquals(2880, loaded.inventory["stone"])

@@ -26,12 +26,28 @@
       "icon": "iron"
     },
     {
+      "id": "silver",
+      "name": "Silver",
+      "rarity": "rare",
+      "baseValue": 24,
+      "color": "#AEC6DC",
+      "icon": "silver"
+    },
+    {
       "id": "gold",
       "name": "Gold",
       "rarity": "rare",
       "baseValue": 45,
       "color": "#FFD54F",
       "icon": "gold"
+    },
+    {
+      "id": "crystal",
+      "name": "Crystal",
+      "rarity": "epic",
+      "baseValue": 120,
+      "color": "#7FE3E1",
+      "icon": "crystal"
     }
   ]
 }

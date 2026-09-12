@@ -15,7 +15,7 @@ class ContentLoaderTest {
         val content = TestContent.build()
         assertEquals(3, content.resources.size)
         assertEquals(2, content.nodeTypes.size)
-        assertEquals(5, content.upgrades.size)
+        assertEquals(7, content.upgrades.size)
         assertEquals(2, content.world.nodes.size)
         assertNotNull(content.resource("stone"))
         assertNotNull(content.nodeType("gold_vein"))
@@ -105,19 +105,21 @@ class ContentLoaderTest {
         }
     }
 
-    // ------------------------------------------------------------- phase 2: camera + visuals
+    // ------------------------------------------------------------- phase 3: camera + visuals
 
     @Test
     fun `camera and visuals parse from world data`() {
         val content = TestContent.build()
         val camera = content.world.camera
         assertEquals(31f, camera.yaw, 0.001f)
-        assertEquals(33f, camera.pitch, 0.001f)
-        assertEquals(21.5f, camera.distance, 0.001f)
-        assertEquals(42f, camera.fov, 0.001f)
+        assertEquals(45f, camera.pitch, 0.001f)
+        assertEquals(60f, camera.distance, 0.001f)
         assertEquals(3, camera.target.size)
-        assertEquals(0.18f, camera.followStrength, 0.001f)
-        assertEquals(3.2f, camera.followDeadzone, 0.001f)
+        assertEquals(26f, camera.zoomHeight, 0.001f)
+        assertEquals(13f, camera.zoomMinHeight, 0.001f)
+        assertEquals(52f, camera.zoomMaxHeight, 0.001f)
+        assertEquals(15f, camera.panRangeX, 0.001f)
+        assertEquals(14f, camera.panRangeZ, 0.001f)
 
         val visuals = content.world.visuals
         assertEquals("aces", visuals.toneMapping)
@@ -134,10 +136,36 @@ class ContentLoaderTest {
         // bundleOverrides' world file has no camera/visuals blocks at all.
         val content = ContentLoader.load(TestContent.bundleOverrides())
         val camera = content.world.camera
-        assertEquals(30f, camera.yaw, 0.001f)
-        assertEquals(0.16f, camera.followStrength, 0.001f)
+        assertEquals(31f, camera.yaw, 0.001f)
+        assertEquals(45f, camera.pitch, 0.001f)
+        assertEquals(26f, camera.zoomHeight, 0.001f)
         assertEquals("aces", content.world.visuals.toneMapping)
         assertTrue(content.world.visuals.fog.enabled)
+    }
+
+    @Test
+    fun `market tuning parses from economy data`() {
+        val content = TestContent.build()
+        val market = content.economy.market
+        assertEquals(0.22f, market.amplitude, 0.001f)
+        assertEquals(300f, market.basePeriodSec, 0.001f)
+        assertEquals(180f, market.periodSpreadSec, 0.001f)
+        assertEquals(30f, market.trendWindowSec, 0.001f)
+    }
+
+    @Test
+    fun `market amplitude above ninety percent is rejected`() {
+        try {
+            ContentLoader.load(TestContent.bundleOverrides(
+                ContentLoader.FILE_ECONOMY to """
+                    { "version": 1, "start": { "money": 25, "backpack": 12 },
+                      "market": { "amplitude": 1.5 } }
+                """.trimIndent(),
+            ))
+            fail("expected amplitude failure")
+        } catch (e: ContentException) {
+            assertTrue(e.message!!.contains("market.amplitude"))
+        }
     }
 
     @Test
@@ -173,18 +201,34 @@ class ContentLoaderTest {
     }
 
     @Test
-    fun `invalid camera fov is rejected`() {
+    fun `camera pitch outside the ortho range is rejected`() {
         try {
             ContentLoader.load(TestContent.bundleOverrides(
                 ContentLoader.FILE_WORLD to """
                     { "version": 1, "zone": "z", "name": "Z",
                       "nodes": [ { "typeId": "stone_vein", "at": [1, 6] } ],
-                      "camera": { "fov": 0 } }
+                      "camera": { "pitch": 0 } }
                 """.trimIndent(),
             ))
-            fail("expected fov failure")
+            fail("expected pitch failure")
         } catch (e: ContentException) {
-            assertTrue(e.message!!.contains("camera.fov"))
+            assertTrue(e.message!!.contains("camera.pitch"))
+        }
+    }
+
+    @Test
+    fun `inverted camera zoom range is rejected`() {
+        try {
+            ContentLoader.load(TestContent.bundleOverrides(
+                ContentLoader.FILE_WORLD to """
+                    { "version": 1, "zone": "z", "name": "Z",
+                      "nodes": [ { "typeId": "stone_vein", "at": [1, 6] } ],
+                      "camera": { "zoomMinHeight": 30, "zoomMaxHeight": 20 } }
+                """.trimIndent(),
+            ))
+            fail("expected zoom range failure")
+        } catch (e: ContentException) {
+            assertTrue(e.message!!.contains("zoomMaxHeight"))
         }
     }
 

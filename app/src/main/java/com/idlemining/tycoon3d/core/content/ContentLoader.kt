@@ -96,7 +96,10 @@ object ContentLoader {
             if (u.baseCost < 0) throw ContentException("upgrades.json: '${u.id}' has negative baseCost")
             if (u.costGrowth <= 1.0f) throw ContentException("upgrades.json: '${u.id}' costGrowth must exceed 1.0")
             if (u.maxLevel < 1) throw ContentException("upgrades.json: '${u.id}' maxLevel must be at least 1")
-            val known = setOf("miningSpeed", "moveSpeed", "backpack", "sellMargin", "idleExtraction")
+            val known = setOf(
+                "miningSpeed", "moveSpeed", "backpack", "sellMargin", "idleExtraction",
+                "luckyStrike", "offlineCap",
+            )
             if (u.effect.type !in known) {
                 throw ContentException("upgrades.json: '${u.id}' unknown effect type '${u.effect.type}'")
             }
@@ -112,7 +115,17 @@ object ContentLoader {
         if (file.worker.moveSpeed <= 0f) throw ContentException("economy.json: worker moveSpeed must be positive")
         if (file.worker.mineDps <= 0f) throw ContentException("economy.json: worker mineDps must be positive")
         if (file.idle.offlineCapHours < 1) throw ContentException("economy.json: offlineCapHours must be at least 1")
+        validateMarket(file.market)
         return file
+    }
+
+    private fun validateMarket(m: MarketTuning) {
+        if (m.amplitude < 0f || m.amplitude > 0.9f) {
+            throw ContentException("economy.json: market.amplitude must be in [0, 0.9]")
+        }
+        if (m.basePeriodSec <= 0f) throw ContentException("economy.json: market.basePeriodSec must be positive")
+        if (m.periodSpreadSec < 0f) throw ContentException("economy.json: market.periodSpreadSec must be >= 0")
+        if (m.trendWindowSec <= 0f) throw ContentException("economy.json: market.trendWindowSec must be positive")
     }
 
     private fun validateWorld(file: WorldFile, nodeTypes: List<NodeTypeDef>): WorldFile {
@@ -140,13 +153,21 @@ object ContentLoader {
     private fun validateCamera(cam: CameraDef) {
         if (cam.target.size != 3) throw ContentException("world.json: camera.target must be [x, y, z]")
         if (cam.distance <= 0f) throw ContentException("world.json: camera.distance must be positive")
-        if (cam.fov <= 0f || cam.fov >= 180f) throw ContentException("world.json: camera.fov must be in (0, 180)")
-        if (cam.followStrength < 0f || cam.followStrength > 1f) {
-            throw ContentException("world.json: camera.followStrength must be in [0, 1]")
+        if (cam.pitch <= 0f || cam.pitch >= 90f) {
+            throw ContentException("world.json: camera.pitch must be in (0, 90) — locked ortho angle")
         }
-        if (cam.followDeadzone < 0f) throw ContentException("world.json: camera.followDeadzone must be >= 0")
-        if (cam.followRangeX < 0f || cam.followRangeZ < 0f) {
-            throw ContentException("world.json: camera follow ranges must be >= 0")
+        if (cam.zoomMaxHeight <= cam.zoomMinHeight) {
+            throw ContentException("world.json: camera.zoomMaxHeight must exceed zoomMinHeight")
+        }
+        if (cam.zoomHeight < cam.zoomMinHeight || cam.zoomHeight > cam.zoomMaxHeight) {
+            throw ContentException("world.json: camera.zoomHeight must be within [zoomMinHeight, zoomMaxHeight]")
+        }
+        if (cam.zoomMinHeight <= 0f) throw ContentException("world.json: camera.zoomMinHeight must be positive")
+        if (cam.panRangeX < 0f || cam.panRangeZ < 0f) {
+            throw ContentException("world.json: camera pan ranges must be >= 0")
+        }
+        if (cam.near <= 0f || cam.far <= cam.near) {
+            throw ContentException("world.json: camera near/far must satisfy 0 < near < far")
         }
     }
 

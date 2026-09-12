@@ -149,6 +149,8 @@ private fun effectSummary(def: UpgradeDef, level: Int, content: GameContent): St
         "moveSpeed" -> "Current: +${(per * level * 100).toInt()}% move speed"
         "backpack" -> "Current: +${(per * level).toInt()} capacity"
         "sellMargin" -> "Current: +${(per * level * 100).toInt()}% sell prices"
+        "luckyStrike" -> "Current: +${(per * level * 100).toInt()}% double-loot chance"
+        "offlineCap" -> "Current: +${(per * level).toInt()}h offline earnings cap"
         "idleExtraction" -> {
             val rates = EconomyRules.idleRatesPerSecond(content, level)
             if (rates.isEmpty()) {

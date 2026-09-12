@@ -15,24 +15,30 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.idlemining.tycoon3d.core.economy.EconomyRules
 import com.idlemining.tycoon3d.core.economy.formatMoney
 import com.idlemining.tycoon3d.game.GameState
 
 /**
- * Bottom action bar: SELL (sends the worker to the depot) and UPGRADES (opens
- * the panel). The SELL button previews the current inventory value; the
- * UPGRADES button shows a badge whenever something is affordable.
+ * Bottom action bar: SELL (sends the worker to the depot at live prices),
+ * MARKET (opens the price board) and UPGRADES (opens the shop panel). The
+ * SELL button previews the current inventory value at the *current* market
+ * multiplier; the UPGRADES button shows a badge whenever something is
+ * affordable.
  */
 @Composable
 fun BottomBar(
     state: GameState,
     onSell: () -> Unit,
+    onMarket: () -> Unit,
     onUpgrades: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val value = EconomyRules.inventoryValue(state.content, state.inventory, state.upgrades)
+    val value = EconomyRules.inventoryValue(
+        state.content, state.inventory, state.upgrades, state.marketTimeSec,
+    )
 
     val anyAffordable = state.content.upgradeOrder.any { id ->
         val def = state.content.upgrade(id)
@@ -44,13 +50,13 @@ fun BottomBar(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 14.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Button(
             onClick = onSell,
             modifier = Modifier
-                .weight(1f)
+                .weight(1.35f)
                 .height(56.dp),
             shape = RoundedCornerShape(16.dp),
             colors = androidx.compose.material3.ButtonDefaults.buttonColors(
@@ -64,7 +70,21 @@ fun BottomBar(
             )
         }
 
-        Box(modifier = Modifier.weight(1f)) {
+        Button(
+            onClick = onMarket,
+            modifier = Modifier
+                .weight(0.85f)
+                .height(56.dp),
+            shape = RoundedCornerShape(16.dp),
+        ) {
+            Text(
+                text = "MARKET",
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+            )
+        }
+
+        Box(modifier = Modifier.weight(1.05f)) {
             Button(
                 onClick = onUpgrades,
                 modifier = Modifier
@@ -72,7 +92,11 @@ fun BottomBar(
                     .height(56.dp),
                 shape = RoundedCornerShape(16.dp),
             ) {
-                Text(text = "UPGRADES", fontWeight = FontWeight.Bold)
+                Text(
+                    text = "UPGRADES",
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                )
             }
             if (anyAffordable) {
                 Badge(

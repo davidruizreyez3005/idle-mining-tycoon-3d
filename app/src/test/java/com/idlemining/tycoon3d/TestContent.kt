@@ -60,9 +60,15 @@ object TestContent {
                     { "id": "backpack", "name": "Big Backpack", "desc": "d",
                       "effect": { "type": "backpack", "perLevel": 6.0 },
                       "baseCost": 50, "costGrowth": 1.7, "maxLevel": 10 },
+                    { "id": "lucky", "name": "Lucky Strikes", "desc": "d",
+                      "effect": { "type": "luckyStrike", "perLevel": 0.06 },
+                      "baseCost": 260, "costGrowth": 2.0, "maxLevel": 8 },
                     { "id": "market", "name": "Trade Contracts", "desc": "d",
                       "effect": { "type": "sellMargin", "perLevel": 0.15 },
                       "baseCost": 120, "costGrowth": 2.0, "maxLevel": 10 },
+                    { "id": "warehouse", "name": "Warehouse", "desc": "d",
+                      "effect": { "type": "offlineCap", "perLevel": 2.0 },
+                      "baseCost": 220, "costGrowth": 2.15, "maxLevel": 6 },
                     { "id": "extractor", "name": "Auto-Extractor", "desc": "d",
                       "effect": { "type": "idleExtraction", "rates": [
                         { "resource": "stone", "perLevel": 0.4, "unlockLevel": 1 },
@@ -77,16 +83,18 @@ object TestContent {
                   "start": { "money": 25, "backpack": 12 },
                   "worker": { "moveSpeed": 2.4, "mineDps": 22, "collectRadius": 1.5, "reachRadius": 1.8 },
                   "sell": { "depotRadius": 3.0 },
-                  "idle": { "offlineCapHours": 4 } }
+                  "idle": { "offlineCapHours": 4 },
+                  "market": { "amplitude": 0.22, "basePeriodSec": 300, "periodSpreadSec": 180, "trendWindowSec": 30 } }
             """.trimIndent(),
 
             ContentLoader.FILE_WORLD to """
                 { "version": 1, "zone": "test_quarry", "name": "Test Quarry",
                   "ground": { "size": [46, 46], "grassColor": "#7CB342", "dirtColor": "#A1887F",
                               "rockColor": "#78909C", "pathWidth": 4.2 },
-                  "camera": { "yaw": 31, "pitch": 33, "distance": 21.5, "fov": 42,
-                              "target": [0, 0.6, -4.5], "followStrength": 0.18,
-                              "followDeadzone": 3.2, "followRangeX": 10, "followRangeZ": 8 },
+                  "camera": { "yaw": 31, "pitch": 45, "distance": 60,
+                              "target": [0, 0.6, -5], "zoomHeight": 26,
+                              "zoomMinHeight": 13, "zoomMaxHeight": 52,
+                              "panRangeX": 15, "panRangeZ": 14, "near": 1, "far": 400 },
                   "visuals": {
                     "sun": { "color": "#FFF1D6", "intensity": 26000,
                              "direction": [-0.42, -0.78, 0.46], "shadowMapSize": 2048 },
