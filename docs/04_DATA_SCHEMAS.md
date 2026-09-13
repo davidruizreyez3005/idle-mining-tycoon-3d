@@ -135,6 +135,28 @@ so inserting nodes appends (never reorders). `props` reference kit piece ids
 (`KitCatalog`); unknown ids are skipped, which is what lets the AI asset pipeline
 introduce richer pieces later without touching this file.
 
+### performance block (Phase 3.5)
+
+Mobile render tuning, applied on top of the `RenderQuality.Default` preset by
+`ScenePerformance` (after the zone `visuals`). All fields have mobile-first
+defaults, so a zone without a `performance` block still runs fast:
+
+```json
+"performance": {
+  "dynamicResolution": { "enabled": true, "minScale": 0.5, "maxScale": 1.0, "quality": "medium" },
+  "ssao": false,          // screen-space ambient occlusion
+  "msaaSampleCount": 0,   // 0/1 = FXAA only; 4 was the pre-tuning default
+  "hdrQuality": "medium", // low | medium | high
+  "bloomQuality": "low",  // low | medium | high
+  "softShadows": false    // PCSS penumbra sampling
+}
+```
+
+Dynamic resolution is the frame-rate safety net: Filament measures frame time
+and rescales the render target within `minScale..maxScale` (homogeneous, so no
+aspect distortion). Validation rejects inverted/out-of-range scale windows,
+unknown tier names and unsupported MSAA sample counts.
+
 ## Save schema (v1)
 
 Written as JSON via `SaveStorage` (atomic tmp+rename), migrated forward by

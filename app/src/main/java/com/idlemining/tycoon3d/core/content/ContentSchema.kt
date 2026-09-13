@@ -152,6 +152,8 @@ data class WorldFile(
     val ground: GroundDef = GroundDef(),
     val camera: CameraDef = CameraDef(),
     val visuals: VisualsDef = VisualsDef(),
+    /** Mobile render tuning — Phase 3.5 performance profile. */
+    val performance: PerformanceDef = PerformanceDef(),
     /** Worker spawn point as [x, z]. */
     val spawn: List<Float> = listOf(0f, 0f),
     val cliff: CliffDef = CliffDef(),
@@ -293,6 +295,50 @@ data class VignetteDef(
     val midPoint: Float = 0.45f,
     val roundness: Float = 0.5f,
     val feather: Float = 0.55f,
+)
+
+// ---------------------------------------------------------------------------
+// performance — mobile render tuning (Phase 3.5)
+// ---------------------------------------------------------------------------
+
+/**
+ * Render performance profile. The pre-tuning build shipped the `Cinematic`
+ * preset (MSAA 4x + SSAO high + 2048px PCSS shadows) and ran at an unstable
+ * frame rate on mid-range phones. This block re-tunes the same Filament view
+ * for a locked 60: the defaults below are what a zone gets when it does not
+ * author a `performance` block at all, and they are all mobile-first.
+ *
+ * - [dynamicResolution]: Filament rescales the render target every few frames
+ *   to hold the device's frame rate — the single most effective GPU relief.
+ * - [ssao]: screen-space ambient occlusion. Off by default: the sun + shadow
+ *   map already ground every object; SSAO high cost ~1-2 ms/frame on mid-GPUs.
+ * - [msaaSampleCount]: 0/1 = FXAA only (cheap); 4 was the old default and was
+ *   the most expensive single toggle in the pipeline.
+ * - [hdrQuality]: HDR color buffer tier — medium is visually identical for this
+ *   stylized palette at half the bandwidth.
+ * - [bloomQuality]: bloom pyramid tier.
+ * - [softShadows]: PCSS penumbra sampling. Off = hard sample taps only.
+ */
+@Serializable
+data class PerformanceDef(
+    val dynamicResolution: DynamicResolutionDef = DynamicResolutionDef(),
+    val ssao: Boolean = false,
+    val msaaSampleCount: Int = 0,
+    /** One of: low | medium | high. */
+    val hdrQuality: String = "medium",
+    /** One of: low | medium | high. */
+    val bloomQuality: String = "low",
+    val softShadows: Boolean = false,
+)
+
+@Serializable
+data class DynamicResolutionDef(
+    val enabled: Boolean = true,
+    /** Render-target scale floor — 0.5 = half resolution worst case. */
+    val minScale: Float = 0.5f,
+    val maxScale: Float = 1.0f,
+    /** History quality used to pick the scale: low | medium | high. */
+    val quality: String = "medium",
 )
 
 @Serializable

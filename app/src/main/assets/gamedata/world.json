@@ -39,7 +39,7 @@
         0.46
       ],
       "angularRadius": 1.9,
-      "shadowMapSize": 2048
+      "shadowMapSize": 1024
     },
     "fill": {
       "color": "#AECBEB",
@@ -81,6 +81,19 @@
     "exposure": 1.06,
     "contrast": 1.06,
     "saturation": 1.1
+  },
+  "performance": {
+    "dynamicResolution": {
+      "enabled": true,
+      "minScale": 0.5,
+      "maxScale": 1.0,
+      "quality": "medium"
+    },
+    "ssao": false,
+    "msaaSampleCount": 0,
+    "hdrQuality": "medium",
+    "bloomQuality": "low",
+    "softShadows": false
   },
   "spawn": [
     0,

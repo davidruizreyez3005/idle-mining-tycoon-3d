@@ -49,34 +49,32 @@ jobs:
           retention-days: 14
 
       # ------------------------------------------------------------------ release
-      # Runs only on pushes to main. Recreates the v0.3.0 release each time so
+      # Runs only on pushes to main. Recreates the v0.3.1 release each time so
       # there is always exactly one canonical "latest" build. Uses the built-in
       # GITHUB_TOKEN — no personal credentials in CI.
       - name: Publish release
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: v0.3.0
+          TAG: v0.3.1
         run: |
           set -e
-          cp app/build/outputs/apk/release/app-release.apk MiningTycoon3D-v0.3.0.apk
+          cp app/build/outputs/apk/release/app-release.apk MiningTycoon3D-v0.3.1.apk
           # Replace any previous release at this tag (idempotent re-publish).
           gh release delete "$TAG" --yes --cleanup-tag 2>/dev/null || true
           gh release create "$TAG" \
-            --title "Mining Tycoon 3D — Phase 3 v0.3.0" \
+            --title "Mining Tycoon 3D — Performance v0.3.1" \
             --notes "Automated build from $GITHUB_SHA (run $GITHUB_RUN_NUMBER).
 
-          **Install:** download \`MiningTycoon3D-v0.3.0.apk\` below, allow installs from your browser, and play.
+          **Install:** download \`MiningTycoon3D-v0.3.1.apk\` below, allow installs from your browser, and play.
 
-          **Phase 3 — economy depth + upgrade abilities:**
-          - Locked 45° orthographic camera: drag to pan, pinch to zoom, angle never changes
-          - Blur/vignette frame removed — clean, unframed viewport edges
-          - Dynamic market: resource prices drift on live sine waves — time your sells (new MARKET panel with trend arrows)
-          - New resources: Silver and Crystal, with new veins placed in the quarry
-          - Lucky Strikes upgrade: chance for double loot when a vein breaks
-          - Warehouse upgrade: offline earnings cap extends 2h per level
-          - Auto-Extractor now mines silver (level 7) and crystal (level 10)
+          **v0.3.1 — Speed & performance pass (the game should now hold 60 FPS on mid-range phones):**
+          - GPU: dynamic resolution ON (auto-scales to hold frame rate), MSAA 4x removed (FXAA only), SSAO off, 1024px shadows without PCSS, cheaper HDR/bloom tiers — all data-driven via the new \`performance\` block in world.json
+          - CPU: the 3D world no longer recomposes 10x/second — the whole scene composition was re-running on every simulation tick
+          - Frame loop: locked camera angle cached (no per-frame lookAt/projection math), transforms only written when values actually change (no more per-frame allocations for idle objects)
+          - UI: HUD panels derive 1 Hz snapshots instead of recomposing at 10 Hz with economy math
+          - Engine: autosave JSON now encodes off the main thread; fixed a MaterialInstance leak on every vein break
 
-          Plus the full vertical slice: 6 resources, 15 veins, upgrades, idle earnings, saves." \
+          Everything from Phase 3 still here: locked 45° ortho pan/zoom camera, dynamic market, lucky strikes, warehouse, silver + crystal, 6 resources, 15 veins, upgrades, idle earnings, saves." \
             --latest \
-            "MiningTycoon3D-v0.3.0.apk"
+            "MiningTycoon3D-v0.3.1.apk"

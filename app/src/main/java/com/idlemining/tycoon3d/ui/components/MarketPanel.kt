@@ -6,8 +6,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -19,31 +17,32 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.idlemining.tycoon3d.core.content.ContentLoader
-import com.idlemining.tycoon3d.core.economy.EconomyRules
-import com.idlemining.tycoon3d.core.economy.formatMoney
+import androidx.compose.foundation.layout.heightIn
 import com.idlemining.tycoon3d.game.GameState
 import com.idlemining.tycoon3d.ui.theme.MoneyGreen
 import com.idlemining.tycoon3d.ui.theme.WarnRed
 
 /**
  * Phase 3 market sheet — live prices per resource. Every resource rides its
- * own slow sine wave ([EconomyRules.marketMultiplier]), so the right time to
- * sell becomes a real decision: hold a full backpack while the arrow points
- * up, dump it when your resource peaks. Rows update on every state emission
- * (10 Hz) straight from the simulation's market clock.
+ * own slow sine wave ([com.idlemining.tycoon3d.core.economy.EconomyRules.marketMultiplier]),
+ * so the right time to sell becomes a real decision: hold a full backpack
+ * while the arrow points up, dump it when your resource peaks.
+ *
+ * Rows come from a 1 Hz-quantized derived snapshot ([rememberMarketRows]) —
+ * the sheet recomposes once per second while open instead of ten times.
  */
 @Composable
 fun MarketPanel(
-    state: GameState,
+    state: State<GameState>,
     modifier: Modifier = Modifier,
 ) {
-    val time = state.marketTimeSec
+    val rows = rememberMarketRows(state)
 
     Column(
         modifier = modifier
@@ -74,20 +73,16 @@ fun MarketPanel(
         LazyColumn(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            items(state.content.resourceOrder) { id ->
-                MarketRow(state = state, resourceId = id, time = time)
+            items(rows, key = { it.id }) { row ->
+                MarketRow(row)
             }
         }
     }
 }
 
 @Composable
-private fun MarketRow(state: GameState, resourceId: String, time: Double) {
-    val res = state.content.resource(resourceId)
-    val dot = Color(ContentLoader.parseColor(res.color, "resource").toInt())
-    val price = EconomyRules.sellPricePerUnit(state.content, res, state.upgrades, time)
-    val trend = EconomyRules.priceTrend(state.content, resourceId, time)
-    val pct = (EconomyRules.marketMultiplier(state.content, resourceId, time) - 1.0) * 100.0
+private fun MarketRow(row: MarketRowData) {
+    val dot = Color(row.colorArgb.toInt())
 
     Card(
         shape = RoundedCornerShape(14.dp),
@@ -108,32 +103,30 @@ private fun MarketRow(state: GameState, resourceId: String, time: Double) {
                 modifier = Modifier.padding(start = 12.dp).weight(1f),
             ) {
                 Text(
-                    text = res.name,
+                    text = row.name,
                     fontWeight = FontWeight.Bold,
                     style = MaterialTheme.typography.titleMedium,
                 )
-                val units = state.inventory[resourceId] ?: 0
                 Text(
-                    text = if (units > 0) "holding $units" else "not held",
+                    text = if (row.units > 0) "holding ${row.units}" else "not held",
                     style = MaterialTheme.typography.labelSmall,
-                    color = if (units > 0) MaterialTheme.colorScheme.primary
+                    color = if (row.units > 0) MaterialTheme.colorScheme.primary
                     else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
-            val trendColor = when {
-                trend > 0 -> MoneyGreen
-                trend < 0 -> WarnRed
-                else -> MaterialTheme.colorScheme.onSurfaceVariant
+            val trendColor = when (row.trendUp) {
+                true -> MoneyGreen
+                false -> WarnRed
+                null -> MaterialTheme.colorScheme.onSurfaceVariant
             }
-            val trendSymbol = when {
-                trend > 0 -> "▲"
-                trend < 0 -> "▼"
-                else -> "—"
+            val trendSymbol = when (row.trendUp) {
+                true -> "▲"
+                false -> "▼"
+                null -> "—"
             }
-            val sign = if (pct >= 0) "+" else ""
             Text(
-                text = "$trendSymbol $sign${String.format(java.util.Locale.US, "%.0f", pct)}%",
+                text = "$trendSymbol ${row.pctText}",
                 color = trendColor,
                 fontWeight = FontWeight.Bold,
                 style = MaterialTheme.typography.labelLarge,
@@ -141,7 +134,7 @@ private fun MarketRow(state: GameState, resourceId: String, time: Double) {
             )
 
             Text(
-                text = formatMoney(price),
+                text = row.priceText,
                 color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.Bold,
                 style = MaterialTheme.typography.titleMedium,

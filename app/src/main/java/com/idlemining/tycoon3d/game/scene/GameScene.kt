@@ -31,6 +31,15 @@ import io.github.sceneview.rememberView
  * animation and the camera in `onFrame` (the Compose tree never recomposes
  * during play).
  *
+ * **Recomposition contract (performance-critical).** This composable takes
+ * [content] (an immutable, `@Stable` [GameContent]) and the live state only as
+ * a [State] *holder* — `gameState.value` is read exclusively inside the frame
+ * and touch callbacks, never during composition. Reading `.value` during
+ * composition would subscribe the entire world sub-tree (~1000 node
+ * composables) to the 10 Hz simulation emissions and re-execute it ten times a
+ * second on the main thread — that was the single biggest frame-rate killer in
+ * the pre-tuning build.
+ *
  * Camera — LOCKED 45° ORTHO (Phase 3): the angle and the orthographic
  * projection are authored in `world.json` and never change. The player pans
  * by dragging (one finger) and zooms by pinching, both clamped so the mine
@@ -38,11 +47,11 @@ import io.github.sceneview.rememberView
  * Passing `cameraManipulator = null` keeps SceneView's gesture layer from
  * ever touching the camera node.
  *
- * Presentation — (Phase 2): warm sun + cool sky fill (both data-driven, the
- * sun casting soft 2048px shadows), neutral IBL under a sky-colored skybox,
- * distance fog with sun in-scattering, SSAO, bloom and an ACES color grade
- * ([ScenePresentation]). The vignette is disabled in data (Phase 3: clean,
- * unframed edges).
+ * Presentation — Phase 2 + the Phase 3.5 mobile performance profile: the
+ * `RenderQuality.Default` preset is applied by SceneView, then the zone look
+ * ([ScenePresentation]) and finally the render-pipeline tuning
+ * ([ScenePerformance]: dynamic resolution, FXAA-only AA, SSAO off, 1024px
+ * non-PCSS shadows) layer on top. See those files for the budget math.
  *
  * Input model (touch-first):
  * - Tap on a node    → walk there and mine it
@@ -53,6 +62,7 @@ import io.github.sceneview.rememberView
  */
 @Composable
 fun GameScene(
+    content: GameContent,
     gameState: State<GameState>,
     dispatch: (GameIntent) -> Unit,
     modifier: Modifier = Modifier,
@@ -60,7 +70,6 @@ fun GameScene(
     val engine = rememberEngine()
     val materialLoader = rememberMaterialLoader(engine)
     val context = LocalContext.current
-    val content: GameContent = gameState.value.content
     val visuals = content.world.visuals
     val cameraConfig = content.world.camera
 
@@ -68,7 +77,9 @@ fun GameScene(
     val nodeCount = content.world.nodes.size
     val refs = remember(content) { SceneRefs(nodeCount) }
     val registry = remember(content) { NodeRegistry() }
-    val animator = remember(refs, mats) { SceneAnimator(refs, mats, nodeCount) }
+    val animator = remember(refs, mats, content) {
+        SceneAnimator(refs, mats, nodeCount, content)
+    }
     val cameraController = remember(cameraConfig) { OrthoCameraController(cameraConfig) }
     val dispatchLatest = rememberUpdatedState(dispatch)
     val density = LocalDensity.current
@@ -100,8 +111,10 @@ fun GameScene(
         view = view,
         // Authored world coordinates are final — do not re-center the content.
         autoCenterContent = false,
-        // Full fidelity: MSAA 4x + FXAA, SSAO high, HDR high, shadows on.
-        renderQuality = RenderQuality.Cinematic,
+        // Mobile-tuned base preset: FXAA, SSAO default-on, HDR MEDIUM, no MSAA.
+        // ScenePerformance (below) then applies the authored performance block
+        // on top — dynamic resolution, SSAO off, cheap post-processing.
+        renderQuality = RenderQuality.Default,
         mainLightNode = sun,
         fillLightNode = fill,
         environment = environment,
@@ -131,11 +144,13 @@ fun GameScene(
         WorldBuilder(content, refs, registry, mats)
     }
 
-    // ── Post-processing — applied AFTER SceneView's Cinematic preset effect
-    //    (LaunchedEffects run in composition order, and ours is registered
-    //    later), so the preset cannot clobber the zone look.
+    // ── Post-processing + performance profile — applied AFTER SceneView's
+    //    preset effect (LaunchedEffects run in composition order, and ours is
+    //    registered later), so neither the preset nor the zone look can
+    //    clobber the final tuning. Runs once per content — never per frame.
     LaunchedEffect(view, content.world.zone) {
         ScenePresentation.applyPostFx(view, engine, visuals)
+        ScenePerformance.apply(view, content.world.performance)
     }
 }
 

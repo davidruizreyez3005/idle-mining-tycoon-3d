@@ -5,6 +5,7 @@ import com.idlemining.tycoon3d.core.save.SaveStorage
 import com.idlemining.tycoon3d.core.save.decodeSave
 import com.idlemining.tycoon3d.core.save.SaveJson
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -23,9 +24,12 @@ import kotlin.math.max
  * (wall-clock compensated). Intents are reduced through the pure [Simulation]
  * kernel — the engine itself does no game math. Autosaves every 5 seconds and
  * on pause; away-time earnings are computed once at boot.
+ *
+ * `content` is exposed as a plain immutable val so the 3D scene can take it
+ * as a Compose parameter without subscribing to the 10 Hz state flow.
  */
 class GameEngine(
-    private val content: GameContent,
+    val content: GameContent,
     private val storage: SaveStorage,
     private val scope: CoroutineScope,
     private val loadOnIO: Boolean = false,
@@ -96,19 +100,28 @@ class GameEngine(
         events.forEach { _events.tryEmit(it) }
     }
 
-    /** Immediately stamps and persists the state (called from onPause / onCleared). */
+    /**
+     * Immediately stamps and persists the state (called from onPause / onCleared).
+     *
+     * The JSON encode + file write run on [Dispatchers.Default] — the
+     * pre-tuning build encoded the save on the *main* thread every 5 seconds,
+     * which surfaced as a periodic frame hitch during play.
+     */
     fun saveNow() {
         if (!isLoaded) return
         val snapshot = _state.value
         val now = nowMs()
-        val raw = SaveJson.encodeToString(
-            com.idlemining.tycoon3d.core.save.SaveData.serializer(),
-            Simulation.toSave(snapshot, now),
-        )
         val scope = this.scope
-        scope.launch(NonCancellable) {
-            if (loadOnIO) withContext(kotlinx.coroutines.Dispatchers.IO) { storage.writeRaw(raw) }
-            else storage.writeRaw(raw)
+        scope.launch(NonCancellable + Dispatchers.Default) {
+            val raw = SaveJson.encodeToString(
+                com.idlemining.tycoon3d.core.save.SaveData.serializer(),
+                Simulation.toSave(snapshot, now),
+            )
+            if (loadOnIO) {
+                withContext(kotlinx.coroutines.Dispatchers.IO) { storage.writeRaw(raw) }
+            } else {
+                storage.writeRaw(raw)
+            }
         }
     }
 

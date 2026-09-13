@@ -11,23 +11,25 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.idlemining.tycoon3d.game.GameState
-import com.idlemining.tycoon3d.game.WorkerAction
 
 /**
  * Compact mining progress card — visible only while the worker actively mines,
  * floating above the bottom bar.
+ *
+ * The snapshot changes at 10 Hz *only while mining* (the progress bar must
+ * track the pickaxe damage) and is fully static — zero recompositions — while
+ * the worker walks or idles.
  */
 @Composable
-fun MiningProgress(state: GameState, modifier: Modifier = Modifier) {
-    if (state.worker.action != WorkerAction.MINING) return
-    val node = state.nodes.getOrNull(state.worker.miningNodeIndex) ?: return
-    val def = state.content.nodeType(node.typeId)
-    val progress = (1f - node.hp / node.maxHp).coerceIn(0f, 1f)
+fun MiningProgress(state: State<GameState>, modifier: Modifier = Modifier) {
+    val snap = rememberMiningSnapshot(state)
+    if (!snap.visible) return
 
     Surface(
         modifier = modifier
@@ -42,7 +44,7 @@ fun MiningProgress(state: GameState, modifier: Modifier = Modifier) {
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
-                text = "Mining ${def.name}",
+                text = snap.label,
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Bold,
             )
@@ -52,13 +54,13 @@ fun MiningProgress(state: GameState, modifier: Modifier = Modifier) {
                 horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
             ) {
                 LinearProgressIndicator(
-                    progress = { progress },
+                    progress = { snap.progress },
                     modifier = Modifier.weight(1f),
                     color = MaterialTheme.colorScheme.primary,
                     trackColor = MaterialTheme.colorScheme.surfaceVariant,
                 )
                 Text(
-                    text = "${(progress * 100).toInt()}%",
+                    text = snap.pctText,
                     style = MaterialTheme.typography.labelMedium,
                 )
             }

@@ -248,4 +248,96 @@ class ContentLoaderTest {
         }
     }
 
+    // ------------------------------------------------------ phase 3.5: performance
+
+    @Test
+    fun `performance profile parses from world data`() {
+        val content = TestContent.build()
+        val perf = content.world.performance
+        assertTrue(perf.dynamicResolution.enabled)
+        assertEquals(0.5f, perf.dynamicResolution.minScale, 0.001f)
+        assertEquals(1.0f, perf.dynamicResolution.maxScale, 0.001f)
+        assertEquals("medium", perf.dynamicResolution.quality)
+        assertTrue(!perf.ssao)
+        assertEquals(0, perf.msaaSampleCount)
+        assertEquals("medium", perf.hdrQuality)
+        assertEquals("low", perf.bloomQuality)
+        assertTrue(!perf.softShadows)
+    }
+
+    @Test
+    fun `performance defaults are mobile-first when block is absent`() {
+        // bundleOverrides' world file has no performance block at all.
+        val content = ContentLoader.load(TestContent.bundleOverrides())
+        val perf = content.world.performance
+        assertTrue(perf.dynamicResolution.enabled)
+        assertTrue(!perf.ssao)
+        assertEquals(0, perf.msaaSampleCount)
+        assertEquals("medium", perf.hdrQuality)
+    }
+
+    @Test
+    fun `inverted dynamic resolution window is rejected`() {
+        try {
+            ContentLoader.load(TestContent.bundleOverrides(
+                ContentLoader.FILE_WORLD to """
+                    { "version": 1, "zone": "z", "name": "Z",
+                      "nodes": [ { "typeId": "stone_vein", "at": [1, 6] } ],
+                      "performance": { "dynamicResolution": { "minScale": 0.9, "maxScale": 0.5 } } }
+                """.trimIndent(),
+            ))
+            fail("expected dynamic resolution window failure")
+        } catch (e: ContentException) {
+            assertTrue(e.message!!.contains("dynamicResolution.maxScale"))
+        }
+    }
+
+    @Test
+    fun `out of range dynamic resolution scale is rejected`() {
+        try {
+            ContentLoader.load(TestContent.bundleOverrides(
+                ContentLoader.FILE_WORLD to """
+                    { "version": 1, "zone": "z", "name": "Z",
+                      "nodes": [ { "typeId": "stone_vein", "at": [1, 6] } ],
+                      "performance": { "dynamicResolution": { "minScale": 1.5, "maxScale": 1.0 } } }
+                """.trimIndent(),
+            ))
+            fail("expected minScale failure")
+        } catch (e: ContentException) {
+            assertTrue(e.message!!.contains("dynamicResolution.minScale"))
+        }
+    }
+
+    @Test
+    fun `unknown performance tier is rejected`() {
+        try {
+            ContentLoader.load(TestContent.bundleOverrides(
+                ContentLoader.FILE_WORLD to """
+                    { "version": 1, "zone": "z", "name": "Z",
+                      "nodes": [ { "typeId": "stone_vein", "at": [1, 6] } ],
+                      "performance": { "hdrQuality": "ultra_plus" } }
+                """.trimIndent(),
+            ))
+            fail("expected hdrQuality failure")
+        } catch (e: ContentException) {
+            assertTrue(e.message!!.contains("performance.hdrQuality"))
+        }
+    }
+
+    @Test
+    fun `unsupported msaa sample count is rejected`() {
+        try {
+            ContentLoader.load(TestContent.bundleOverrides(
+                ContentLoader.FILE_WORLD to """
+                    { "version": 1, "zone": "z", "name": "Z",
+                      "nodes": [ { "typeId": "stone_vein", "at": [1, 6] } ],
+                      "performance": { "msaaSampleCount": 3 } }
+                """.trimIndent(),
+            ))
+            fail("expected msaaSampleCount failure")
+        } catch (e: ContentException) {
+            assertTrue(e.message!!.contains("msaaSampleCount"))
+        }
+    }
+
 }

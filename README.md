@@ -5,12 +5,13 @@ data-driven core, a procedural 3D world (Filament via SceneView) and a mobile-on
 development pipeline where GitHub is the single source of truth and GitHub Actions
 is the build farm.
 
-**Current milestone: Phase 3 v0.3.0** — pan/zoom locked-ortho camera, dynamic market,
-new resources and upgrade abilities on top of the cinematic vertical slice.
+**Current milestone: Phase 3.5 v0.3.1** — a full speed & performance pass over the
+Phase 3 build: mobile-tuned rendering, a recomposition-quiet UI and an
+allocation-free frame loop, on top of the dynamic-market vertical slice.
 
 ## Play it
 
-1. Download `MiningTycoon3D-v0.3.0.apk` from the [latest release](https://github.com/davidruizreyez3005/idle-mining-tycoon-3d/releases).
+1. Download `MiningTycoon3D-v0.3.1.apk` from the [latest release](https://github.com/davidruizreyez3005/idle-mining-tycoon-3d/releases).
 2. Install on any Android 7.0+ device (minSdk 24) — the release APK is debug-signed for sideloading.
 3. Tap a rock to mine it, tap the ground to walk. Drag with one finger to pan the
    camera, pinch with two to zoom — the 45° orthographic view angle never changes.
@@ -37,14 +38,45 @@ new resources and upgrade abilities on top of the cinematic vertical slice.
 
 ## Phase 2 — cinematic presentation
 
-- **Depth**: warm sun + cool sky fill (2048 px soft shadow map), atmospheric distance
+- **Depth**: warm sun + cool sky fill (1024 px shadow map), atmospheric distance
   fog with sun in-scattering, a tree ring and mountain silhouettes on a wide apron —
   layered haze instead of a flat backdrop.
 - **Shading**: per-material PBR (brushed steel, near-mirror gold, matte rock,
-  polished-gem ore crystals, unlit glowing lamps), ACES tone mapping, bloom and
-  SSAO on the Cinematic quality preset.
+  polished-gem ore crystals, unlit glowing lamps), ACES tone mapping and bloom.
 - Every look parameter lives in the `visuals` block of `world.json` — per-zone moods
   without touching code.
+
+## Phase 3.5 — speed & performance
+
+The v0.3.0 build felt slow and laggy on mid-range phones. The bottleneck audit
+found six root causes; all are fixed and none of them were the simulation (which
+only ticks at 10 Hz and costs microseconds):
+
+- **GPU**: the `Cinematic` render preset shipped MSAA 4x + FXAA, SSAO HIGH with
+  bilateral upsampling, HDR HIGH, dynamic resolution OFF and a 2048px PCSS shadow
+  map. The new data-driven `performance` block in `world.json` re-tunes the same
+  view: dynamic resolution **on** (Filament rescales the render target to hold
+  frame rate — the safety net on any device), FXAA only, SSAO off, 1024px shadows
+  without PCSS, MEDIUM HDR / LOW bloom tiers.
+- **Compose**: `GameScene` read the live `GameState` during composition, so the
+  entire 3D world composition (~1000 node composables) re-executed on every one of
+  the 10 simulation ticks per second. The scene now takes the immutable
+  `GameContent` and reads live state only inside frame/touch callbacks — it
+  composes exactly once.
+- **HUD**: chips and panels recomposed at 10 Hz with market sine math and string
+  building in composition. They now derive 1 Hz-quantized snapshots
+  (`ui/components/HudSnapshots.kt`) and only recompose when displayed values
+  actually change.
+- **Frame loop**: the locked-ortho camera ran full `lookAt` + `setProjection` +
+  allocations every frame — the angle never changes, so the rotation is cached and
+  everything is dirty-gated (zero work while idle). The animator now writes
+  transforms only when values change (an idle worker or untouched vein costs
+  nothing) and caches content lookups.
+- **Engine**: autosave JSON encoding moved off the main thread (it caused a hitch
+  every 5 s); the simulation no longer allocates a fresh node list per tick when
+  nothing is respawning.
+- **Leak**: every vein break allocated a GPU-backed `MaterialInstance` that was
+  never destroyed — resource materials are cached now.
 
 ## Phase 3 — economy depth + upgrade abilities
 

@@ -18,12 +18,15 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.idlemining.tycoon3d.core.content.GameContent
-import com.idlemining.tycoon3d.core.content.UpgradeDef
 import com.idlemining.tycoon3d.core.economy.EconomyRules
 import com.idlemining.tycoon3d.core.economy.formatMoney
 import com.idlemining.tycoon3d.core.economy.formatRate
@@ -32,13 +35,21 @@ import com.idlemining.tycoon3d.game.GameState
 /**
  * The upgrade shop — fully data-driven from upgrades.json. Every card shows the
  * current effect, the next-level effect and the cost.
+ *
+ * Cards are derived per displayed value (level, cost, affordability) so the
+ * sheet recomposes only when money or upgrade levels actually change — not on
+ * every 10 Hz simulation emission.
  */
 @Composable
 fun UpgradePanel(
-    state: GameState,
+    state: State<GameState>,
     onBuy: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // No composition-time state reads — the derived lambda reads .value only
+    // when the state actually changes, so this panel is recomposition-quiet.
+    val cards by remember { derivedStateOf { upgradeCards(state.value) } }
+
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -56,31 +67,45 @@ fun UpgradePanel(
         LazyColumn(
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            items(state.content.upgradeOrder) { id ->
-                UpgradeCard(
-                    def = state.content.upgrade(id),
-                    level = state.upgradeLevel(id),
-                    money = state.money,
-                    content = state.content,
-                    onBuy = { onBuy(id) },
-                )
+            items(cards, key = { it.id }) { card ->
+                UpgradeCard(card, onBuy = { onBuy(card.id) })
             }
         }
     }
 }
 
-@Composable
-private fun UpgradeCard(
-    def: UpgradeDef,
-    level: Int,
-    money: Double,
-    content: GameContent,
-    onBuy: () -> Unit,
-) {
-    val maxed = EconomyRules.isMaxed(def, level)
-    val cost = EconomyRules.upgradeCost(def, level)
-    val affordable = !maxed && money >= cost
+/** Fully resolved display state for one upgrade card. */
+private data class UpgradeCardData(
+    val id: String,
+    val name: String,
+    val desc: String,
+    val levelText: String,
+    val effectText: String,
+    val buyText: String,
+    val affordable: Boolean,
+)
 
+private fun upgradeCards(state: GameState): List<UpgradeCardData> {
+    val content = state.content
+    return content.upgradeOrder.map { id ->
+        val def = content.upgrade(id)
+        val level = state.upgradeLevel(id)
+        val maxed = EconomyRules.isMaxed(def, level)
+        val cost = EconomyRules.upgradeCost(def, level)
+        UpgradeCardData(
+            id = id,
+            name = def.name,
+            desc = def.desc,
+            levelText = if (maxed) "MAX" else "Lv $level / ${def.maxLevel}",
+            effectText = effectSummary(def, level, content),
+            buyText = if (maxed) "Fully upgraded" else "Buy - ${formatMoney(cost.toDouble())}",
+            affordable = !maxed && state.money >= cost,
+        )
+    }
+}
+
+@Composable
+private fun UpgradeCard(card: UpgradeCardData, onBuy: () -> Unit) {
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
@@ -95,26 +120,26 @@ private fun UpgradeCard(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = def.name,
+                    text = card.name,
                     fontWeight = FontWeight.Bold,
                     style = MaterialTheme.typography.titleMedium,
                 )
                 Text(
-                    text = if (maxed) "MAX" else "Lv $level / ${def.maxLevel}",
+                    text = card.levelText,
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
             Text(
-                text = def.desc,
+                text = card.desc,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 4.dp),
             )
 
             Text(
-                text = effectSummary(def, level, content),
+                text = card.effectText,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(top = 6.dp),
@@ -124,7 +149,7 @@ private fun UpgradeCard(
 
             Button(
                 onClick = onBuy,
-                enabled = affordable,
+                enabled = card.affordable,
                 modifier = Modifier.fillMaxWidth().height(44.dp),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(
@@ -133,7 +158,7 @@ private fun UpgradeCard(
                 ),
             ) {
                 Text(
-                    text = if (maxed) "Fully upgraded" else "Buy - ${formatMoney(cost.toDouble())}",
+                    text = card.buyText,
                     fontWeight = FontWeight.Bold,
                 )
             }
@@ -142,7 +167,7 @@ private fun UpgradeCard(
 }
 
 /** Human-readable current-effect line per upgrade type. */
-private fun effectSummary(def: UpgradeDef, level: Int, content: GameContent): String {
+private fun effectSummary(def: com.idlemining.tycoon3d.core.content.UpgradeDef, level: Int, content: GameContent): String {
     val per = def.effect.perLevel
     return when (def.effect.type) {
         "miningSpeed" -> "Current: +${(per * level * 100).toInt()}% mining speed"

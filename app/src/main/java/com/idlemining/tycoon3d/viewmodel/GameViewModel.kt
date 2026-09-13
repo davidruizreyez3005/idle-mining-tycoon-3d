@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.idlemining.tycoon3d.core.content.AndroidContent
+import com.idlemining.tycoon3d.core.content.GameContent
 import com.idlemining.tycoon3d.core.save.FileSaveStorage
 import com.idlemining.tycoon3d.game.GameEngine
 import com.idlemining.tycoon3d.game.GameEvent
@@ -28,6 +29,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         scope = viewModelScope,
         loadOnIO = true,
     )
+
+    /** Immutable, load-time-constant content — safe to read during composition. */
+    val content: GameContent = engine.content
 
     val state: StateFlow<GameState> = engine.state
     val events: SharedFlow<GameEvent> = engine.events

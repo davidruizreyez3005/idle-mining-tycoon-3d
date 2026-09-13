@@ -102,6 +102,10 @@ object TestContent {
                     "sky": { "color": "#9EC9EC" },
                     "fog": { "enabled": true, "density": 0.012, "cutOffDistance": 85, "color": "#CFE0F2" },
                     "toneMapping": "aces" },
+                  "performance": {
+                    "dynamicResolution": { "enabled": true, "minScale": 0.5, "maxScale": 1.0, "quality": "medium" },
+                    "ssao": false, "msaaSampleCount": 0,
+                    "hdrQuality": "medium", "bloomQuality": "low", "softShadows": false },
                   "spawn": [0, 8],
                   "cliff": { "z": -19, "halfSpan": 14, "height": 5, "depth": 4,
                              "entranceHalfWidth": 3.4, "wallColor": "#6D838F" },

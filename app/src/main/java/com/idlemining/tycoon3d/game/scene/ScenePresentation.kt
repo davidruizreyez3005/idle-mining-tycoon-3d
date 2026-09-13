@@ -28,13 +28,14 @@ import kotlin.math.sqrt
  * ACES grade all come from [VisualsDef] so each zone can carry its own mood.
  *
  * Order of application matters:
- *  1. `SceneView` creates the [View] and applies the `RenderQuality.Cinematic`
- *     preset (MSAA 4x, SSAO high, shadows, bloom scaffold) via its own
- *     `LaunchedEffect`.
+ *  1. `SceneView` creates the [View] and applies the `RenderQuality.Default`
+ *     preset via its own `LaunchedEffect`.
  *  2. [applyPostFx] then runs *after* that effect (its own LaunchedEffect is
  *     registered later in composition) and layers on the zone-specific fog,
  *     vignette, bloom strength and color grading — the preset contract
  *     explicitly preserves tweaks applied after it.
+ *  3. [ScenePerformance] runs last of all and re-tunes the render pipeline for
+ *     the mobile performance profile (dynamic resolution, MSAA/SSAO tiers).
  */
 object ScenePresentation {
 
@@ -122,16 +123,13 @@ object ScenePresentation {
     // ------------------------------------------------------------- post fx
 
     /**
-     * Applies the zone look on top of the Cinematic preset: soft shadows,
-     * distance fog, bloom strength, vignette and the color grade.
-     * Call after `View.applyRenderQuality` — later writes win.
+     * Applies the zone look on top of the preset: distance fog, bloom
+     * strength, vignette and the color grade.
+     * Call after `View.applyRenderQuality` — later writes win. Shadow-map
+     * resolution and the whole mobile performance profile (MSAA/SSAO/dynamic
+     * resolution/PCSS) are owned by [ScenePerformance], which runs after this.
      */
     fun applyPostFx(view: View, engine: Engine, visuals: VisualsDef) {
-        // Soft shadow penumbra (PCSS-style) — keeps shadow edges from aliasing
-        // into hard lines under the low sun. Modest scale, native ratio default.
-        view.softShadowOptions = view.softShadowOptions.apply {
-            penumbraScale = 0.35f
-        }
 
         // Distance haze — extinction fog with sun in-scattering. Applied only
         // beyond `distance` from the camera and capped at maximumOpacity so

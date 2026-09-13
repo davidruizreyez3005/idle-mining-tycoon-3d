@@ -12,13 +12,12 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.idlemining.tycoon3d.core.economy.EconomyRules
-import com.idlemining.tycoon3d.core.economy.formatMoney
 import com.idlemining.tycoon3d.game.GameState
 
 /**
@@ -27,24 +26,19 @@ import com.idlemining.tycoon3d.game.GameState
  * SELL button previews the current inventory value at the *current* market
  * multiplier; the UPGRADES button shows a badge whenever something is
  * affordable.
+ *
+ * Derives a [BottomBarSnapshot] (1 Hz-quantized sell value) — the economy
+ * math runs behind `derivedStateOf` instead of recomposing the bar at 10 Hz.
  */
 @Composable
 fun BottomBar(
-    state: GameState,
+    state: State<GameState>,
     onSell: () -> Unit,
     onMarket: () -> Unit,
     onUpgrades: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val value = EconomyRules.inventoryValue(
-        state.content, state.inventory, state.upgrades, state.marketTimeSec,
-    )
-
-    val anyAffordable = state.content.upgradeOrder.any { id ->
-        val def = state.content.upgrade(id)
-        val level = state.upgradeLevel(id)
-        !EconomyRules.isMaxed(def, level) && state.money >= EconomyRules.upgradeCost(def, level)
-    }
+    val snap = rememberBottomBarSnapshot(state)
 
     Row(
         modifier = modifier
@@ -65,7 +59,7 @@ fun BottomBar(
             ),
         ) {
             Text(
-                text = if (value > 0.0) "SELL ${formatMoney(value)}" else "SELL",
+                text = snap.sellText,
                 fontWeight = FontWeight.Bold,
             )
         }
@@ -98,7 +92,7 @@ fun BottomBar(
                     textAlign = TextAlign.Center,
                 )
             }
-            if (anyAffordable) {
+            if (snap.anyAffordable) {
                 Badge(
                     modifier = Modifier.align(Alignment.TopEnd).padding(4.dp),
                     containerColor = MaterialTheme.colorScheme.error,

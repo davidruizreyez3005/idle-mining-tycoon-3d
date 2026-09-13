@@ -1,6 +1,7 @@
 package com.idlemining.tycoon3d.game.scene
 
 import com.google.android.filament.MaterialInstance
+import com.idlemining.tycoon3d.core.content.GameContent
 import com.idlemining.tycoon3d.core.economy.EconomyRules
 import com.idlemining.tycoon3d.game.GameState
 import com.idlemining.tycoon3d.game.WorkerAction
@@ -10,7 +11,6 @@ import io.github.sceneview.math.Rotation
 import io.github.sceneview.math.Scale
 import io.github.sceneview.node.SphereNode
 import kotlin.math.abs
-import kotlin.math.cos
 import kotlin.math.exp
 import kotlin.math.sin
 
@@ -19,11 +19,22 @@ import kotlin.math.sin
  * [SceneRefs]. Runs inside SceneView's `onFrame` callback — never triggers
  * recomposition. The simulation advances logic at 10 Hz; this animator
  * interpolates worker movement per-frame and plays all effects.
+ *
+ * **Per-frame budget (Phase 3.5).** The pre-tuning build wrote a fresh
+ * `Position`/`Rotation`/`Scale` (FloatArray allocations) onto *every* node on
+ * *every* frame — dozens of short-lived objects per frame plus a Filament
+ * transform recompute per write, which showed up as constant GC churn and
+ * frame drops. This version writes a transform only when its value actually
+ * changed beyond an epsilon: an untouched mine node, an idle worker, an
+ * invisible extractor cost **zero** allocations and **zero** JNI calls per
+ * frame. Content lookups (`nodeType` map hits per node per frame) are cached
+ * at construction.
  */
 class SceneAnimator(
     private val refs: SceneRefs,
     private val mats: KitMaterials,
     private val nodeCount: Int,
+    content: GameContent,
 ) {
 
     private var elapsed = 0.0
@@ -40,9 +51,27 @@ class SceneAnimator(
     private val prevAlive = BooleanArray(nodeCount) { true }
     private val flash = FloatArray(nodeCount) { 0f }
 
+    // Change-gating caches — the last values actually pushed to Filament.
+    private val lastBodyScale = FloatArray(nodeCount) { Float.NaN }
+    private val lastCrystalsVisible = BooleanArray(nodeCount) { true }
+    private var lastBackpackY = Float.NaN
+    private var lastExtractorLevel = -1
+
+    /** Cached respawn durations (seconds) per node index — no map lookups per frame. */
+    private val respawnSeconds: FloatArray
+
     // Effect pools (in-flight instances).
     private val fragments = Array(SceneRefs.FRAGMENT_POOL) { Fragment() }
     private val drops = Array(SceneRefs.DROP_POOL) { Drop() }
+
+    init {
+        val placements = content.world.nodes
+        val respawn = FloatArray(nodeCount)
+        for (i in 0 until nodeCount) {
+            respawn[i] = content.nodeType(placements[i].typeId).respawnSeconds.toFloat()
+        }
+        respawnSeconds = respawn
+    }
 
     private class Fragment {
         var active = false
@@ -96,31 +125,42 @@ class SceneAnimator(
         val moving = w.action == WorkerAction.WALKING
         val mining = w.action == WorkerAction.MINING
         if (moving) walkPhase += dt * 11.0
-        val bob = if (moving) abs(sin(walkPhase)).toFloat() * 0.05f else 0f
 
-        root.position = Position(visX, bob, visZ)
-        root.rotation = Rotation(0f, visFacing, 0f)
+        // Change gating: a settled, idle worker is fully static — no transform
+        // writes, no allocations, nothing for Filament to recompute.
+        val settled = !moving && !mining &&
+            abs(w.x - visX) < 0.0005f && abs(w.z - visZ) < 0.0005f
+        if (!settled) {
+            val bob = if (moving) abs(sin(walkPhase)).toFloat() * 0.05f else 0f
+            root.position = Position(visX, bob, visZ)
+            root.rotation = Rotation(0f, visFacing, 0f)
 
-        // Legs & arms.
-        val swing = if (moving) sin(walkPhase).toFloat() else 0f
-        refs.worker.legPivots[0]?.rotation = Rotation(swing * 38f, 0f, 0f)
-        refs.worker.legPivots[1]?.rotation = Rotation(-swing * 38f, 0f, 0f)
-        refs.worker.armPivots[0]?.rotation = Rotation(-swing * 30f, 0f, 0f)
+            // Legs & arms — only meaningful while animating.
+            val swing = if (moving) sin(walkPhase).toFloat() else 0f
+            refs.worker.legPivots[0]?.rotation = Rotation(swing * 38f, 0f, 0f)
+            refs.worker.legPivots[1]?.rotation = Rotation(-swing * 38f, 0f, 0f)
+            refs.worker.armPivots[0]?.rotation = Rotation(-swing * 30f, 0f, 0f)
 
-        if (mining) {
-            // Pickaxe swing — fast periodic strike.
-            val strike = sin(t * 9f)
-            refs.worker.armPivots[1]?.rotation = Rotation(-35f - (strike * 55f), 0f, 0f)
-            refs.worker.body?.position = Position(0f, 0.58f + abs(strike) * 0.02f, 0f)
-        } else {
-            refs.worker.armPivots[1]?.rotation = Rotation(swing * 30f, 0f, 0f)
-            refs.worker.body?.position = Position(0f, 0.58f, 0f)
+            if (mining) {
+                // Pickaxe swing — fast periodic strike.
+                val strike = sin(t * 9f)
+                refs.worker.armPivots[1]?.rotation = Rotation(-35f - (strike * 55f), 0f, 0f)
+                refs.worker.body?.position = Position(0f, 0.58f + abs(strike) * 0.02f, 0f)
+            } else {
+                refs.worker.armPivots[1]?.rotation = Rotation(swing * 30f, 0f, 0f)
+                refs.worker.body?.position = Position(0f, 0.58f, 0f)
+            }
         }
 
-        // Backpack grows with how full the pack is.
+        // Backpack grows with how full the pack is (quantized — the pack visibly
+        // pulses in steps of ~2% instead of reallocating a Scale every frame).
         val capacity = EconomyRules.backpackCapacity(state.content, state.upgrades).coerceAtLeast(1)
         val fill = (state.totalCarried.toFloat() / capacity).coerceIn(0.15f, 1f)
-        refs.worker.backpack?.scale = Scale(1f, 0.55f + 0.6f * fill, 1f)
+        val packY = 0.55f + 0.6f * fill
+        if (abs(packY - lastBackpackY) > 0.02f) {
+            lastBackpackY = packY
+            refs.worker.backpack?.scale = Scale(1f, packY, 1f)
+        }
     }
 
     private fun smoothAngle(from: Float, to: Float, blend: Float): Float {
@@ -133,8 +173,9 @@ class SceneAnimator(
     // ------------------------------------------------------------------ nodes
 
     private fun updateNodes(state: GameState, dt: Double) {
+        val nodes = state.nodes
         for (i in 0 until nodeCount) {
-            val node = state.nodes[i]
+            val node = nodes[i]
             val visuals = refs.nodes[i]
 
             // Break detection → spawn fragments + drops.
@@ -149,20 +190,30 @@ class SceneAnimator(
                 flash[i] = 0.14f
             }
             prevHp[i] = node.hp
-            flash[i] = (flash[i] - dt.toFloat()).coerceAtLeast(0f)
+            if (flash[i] > 0f) {
+                flash[i] = (flash[i] - dt.toFloat()).coerceAtLeast(0f)
+            }
 
-            val total = (state.content.nodeType(node.typeId).respawnSeconds).toFloat()
-            if (node.alive) {
+            val alive = node.alive
+
+            // Visibility flip on the crystal group happens only on state change.
+            if (alive != lastCrystalsVisible[i]) {
+                lastCrystalsVisible[i] = alive
+                visuals.crystalGroup?.isVisible = alive
+            }
+
+            // Target body scale — only pushed to Filament when it actually moved.
+            val s = if (alive) {
                 val frac = node.hp / node.maxHp
-                val s = 0.72f + 0.28f * frac + flash[i] * 1.4f
-                visuals.body?.scale = Scale(s)
-                visuals.crystalGroup?.isVisible = true
+                0.72f + 0.28f * frac + flash[i] * 1.4f
             } else {
-                // Regrowing ghost.
+                val total = respawnSeconds[i]
                 val progress = if (total > 0f) 1f - (node.respawnRemainingSec / total) else 1f
-                val s = 0.15f + 0.85f * progress
+                0.15f + 0.85f * progress
+            }
+            if (abs(s - lastBodyScale[i]) > 0.001f) {
+                lastBodyScale[i] = s
                 visuals.body?.scale = Scale(s)
-                visuals.crystalGroup?.isVisible = false
             }
         }
     }
@@ -277,7 +328,10 @@ class SceneAnimator(
 
     private fun updateExtractor(state: GameState, t: Float) {
         val level = state.upgradeLevel("extractor")
-        refs.extractor?.isVisible = level > 0
+        if (level != lastExtractorLevel) {
+            lastExtractorLevel = level
+            refs.extractor?.isVisible = level > 0
+        }
         if (level <= 0) return
         refs.extractorDrill?.let { drill ->
             drill.position = Position(0f, 0.2f + abs(sin(t * 11f)) * 0.09f, 0.3f)

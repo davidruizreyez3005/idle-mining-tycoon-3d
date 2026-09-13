@@ -226,14 +226,21 @@ object Simulation {
             }
         }
 
-        // 2. Node respawn countdown (always — cheap, and offline decay landed us here).
-        val respawned = nodes.map { n ->
-            if (n.respawnRemainingSec > 0f) {
-                val left = (n.respawnRemainingSec - dtSec).coerceAtLeast(0f)
-                if (left <= 0f) n.copy(respawnRemainingSec = 0f, hp = n.maxHp) else n.copy(respawnRemainingSec = left)
-            } else n
+        // 2. Node respawn countdown. Skipped — and nothing allocated — when no
+        //    vein is regrowing, which is the overwhelmingly common case at 10 Hz.
+        var anyRespawn = false
+        for (i in nodes.indices) {
+            if (nodes[i].respawnRemainingSec > 0f) { anyRespawn = true; break }
         }
-        if (respawned != nodes) nodes = respawned
+        if (anyRespawn) {
+            val respawned = nodes.map { n ->
+                if (n.respawnRemainingSec > 0f) {
+                    val left = (n.respawnRemainingSec - dtSec).coerceAtLeast(0f)
+                    if (left <= 0f) n.copy(respawnRemainingSec = 0f, hp = n.maxHp) else n.copy(respawnRemainingSec = left)
+                } else n
+            }
+            if (respawned != nodes) nodes = respawned
+        }
 
         // 3. Idle extraction (the Auto-Extractor machine).
         val extractorLevel = state.upgradeLevel("extractor")

@@ -147,6 +147,7 @@ object ContentLoader {
         parseColor(file.cliff.wallColor, "cliff.wallColor")
         validateCamera(file.camera)
         validateVisuals(file.visuals)
+        validatePerformance(file.performance)
         return file
     }
 
@@ -200,6 +201,36 @@ object ContentLoader {
         if (len < 1e-4f) throw ContentException("world.json: $what must not be a zero vector")
     }
 
+    /**
+     * Performance profile — tiers must be known enum names and the dynamic
+     * resolution scale window must be sane (0 < min <= max <= 1).
+     */
+    private fun validatePerformance(p: PerformanceDef) {
+        val tiers = setOf("low", "medium", "high")
+        if (p.hdrQuality !in tiers) {
+            throw ContentException("world.json: performance.hdrQuality must be one of $tiers")
+        }
+        if (p.bloomQuality !in tiers) {
+            throw ContentException("world.json: performance.bloomQuality must be one of $tiers")
+        }
+        if (p.msaaSampleCount !in setOf(0, 1, 2, 4)) {
+            throw ContentException("world.json: performance.msaaSampleCount must be 0, 1, 2 or 4")
+        }
+        val d = p.dynamicResolution
+        if (d.quality !in tiers) {
+            throw ContentException("world.json: performance.dynamicResolution.quality must be one of $tiers")
+        }
+        if (d.minScale <= 0f || d.minScale > 1f) {
+            throw ContentException("world.json: performance.dynamicResolution.minScale must be in (0, 1]")
+        }
+        if (d.maxScale <= 0f || d.maxScale > 1f) {
+            throw ContentException("world.json: performance.dynamicResolution.maxScale must be in (0, 1]")
+        }
+        if (d.maxScale < d.minScale) {
+            throw ContentException("world.json: performance.dynamicResolution.maxScale must be >= minScale")
+        }
+    }
+
     /** Parses "#RRGGBB" into an opaque ARGB long. */
     fun parseColor(hex: String, what: String): Long {
         val s = hex.removePrefix("#")
@@ -210,7 +241,16 @@ object ContentLoader {
     }
 }
 
-/** Thrown/validated aggregate passed to the game. */
+/** Thrown/validated aggregate passed to the game.
+ *
+ * `@Stable` matters for frame rate: the whole 3D scene composition takes this
+ * as a parameter, and the Compose compiler can only skip re-invoking a
+ * composable whose parameters it trusts. The instance is fully immutable
+ * after [ContentLoader.load] (all `val`, nothing mutated — colors parse via
+ * `lazy` into fresh reads), so the promise is safe and the world sub-tree
+ * becomes skippable.
+ */
+@androidx.compose.runtime.Stable
 class GameContent(
     val resources: Map<String, ResourceDef>,
     val resourceOrder: List<String>,

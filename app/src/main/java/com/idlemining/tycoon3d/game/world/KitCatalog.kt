@@ -149,6 +149,13 @@ class KitMaterials(
     private val cache = HashMap<KitColor, MaterialInstance>()
 
     /**
+     * Resource materials are requested on every vein break (the ore drops):
+     * caching them keeps a long session from allocating — and leaking, since
+     * nothing ever destroyed them — one GPU-backed MaterialInstance per break.
+     */
+    private val resourceCache = HashMap<String, MaterialInstance>()
+
+    /**
      * PBR surface finish per palette key — Phase 2. The base color comes from
      * the palette; these parameters give every material a distinct physical
      * personality under the sun + sky fill: brushed metal for steel, near-mirror
@@ -235,10 +242,12 @@ class KitMaterials(
 
     fun of(argb: Long): MaterialInstance = loader.createColorInstance(argb.toInt())
 
-    fun resource(resourceId: String): MaterialInstance = loader.createColorInstance(
-        color = content.resourceArgb(resourceId).toInt(),
-        metallic = crystal.metallic,
-        roughness = crystal.roughness,
-        reflectance = crystal.reflectance,
-    )
+    fun resource(resourceId: String): MaterialInstance = resourceCache.getOrPut(resourceId) {
+        loader.createColorInstance(
+            color = content.resourceArgb(resourceId).toInt(),
+            metallic = crystal.metallic,
+            roughness = crystal.roughness,
+            reflectance = crystal.reflectance,
+        )
+    }
 }
